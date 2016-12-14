@@ -159,8 +159,8 @@ def read_data(filename, plot):
 # Functions to identify features of the data
 
 # finding positive temperature increase spike at hit bottom
-def spike(temperature, depth):
-	print("hi")	
+#def spike(temperature, depth):
+	
 
 ##########################################################################
 # computation

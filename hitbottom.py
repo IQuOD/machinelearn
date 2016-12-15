@@ -71,12 +71,17 @@ def read_data(filename):
 	depth = []
 	temp = []
 	m = len(init_depth)
-	for i in range(0,m):
-		if (init_temp[i] < 0)|(init_temp[i]>50):
-			continue
-		else:
-			depth.append(init_depth[i])
-			temp.append(init_temp[i])
+	if (m != 0):
+		try:
+			for i in range(0,m):
+				if (init_temp[i] < 0)|(init_temp[i]>50):
+					continue
+				else:
+					depth.append(init_depth[i])
+					temp.append(init_temp[i])
+		except:
+			print("depth filter failed, passed")
+			pass
 	n = len(depth)
 	# writing all data to data frame
 	data = np.column_stack((depth,temp))
@@ -128,7 +133,7 @@ def plot_data(plot):
 		plt.figure(figsize=(11.5,9))
 		plt.subplot(1,3,1)
 		plt.plot(data[:,1],data[:,0])
-		spikes = spike(data,gradient)
+		spikes = spike(data,gradient, 3)
 		if (type(spikes) != int):
 			plt.plot(spikes[:,1], spikes[:,0],'ro')
 		plt.ylabel("Depth [m]")
@@ -181,8 +186,10 @@ to detect hit bottoms for XBT drops.
 """
 
 # finding characteristic gradient increase spike for hit bottoms
-def spike(data, gradient):
+def spike(data, gradient, threshold):
 	"""
+	Threshold is the number of standard deviations away from the mean gradient value you 
+	want to use for identifying a spike
 	Using large positive gradient spikes to identify whether or not there is a peak
 	Wire breaks tend to have high temperature after gradient peak, so remove those
 	with higher temp after peak
@@ -193,7 +200,10 @@ def spike(data, gradient):
 	m = len(gradient[:,1])
 	
 	# calculate average gradient value
-	dt_av = sum(gradient[:,1])/float(m)
+	if (m != 0):
+		dt_av = sum(gradient[:,1])/float(m)
+	else:
+		dt_av = 999
 
 	# calculate standard deviation in the gradient (average)
 	"""	
@@ -202,27 +212,60 @@ def spike(data, gradient):
 	"""
 	sq_dev = 0
 	for i in range(0,m):
-		sq_dev = sq_dev + (dt_av - gradient[i][1])**2	
-	std_dev = np.sqrt(sq_dev/float(m))
+		sq_dev = sq_dev + (dt_av - gradient[i][1])**2
+	if (m != 0):	
+		std_dev = np.sqrt(sq_dev/float(m))
 	
-	"""
-	Finding large peaks (3 std.dev away from average chosen arbitrarily, T must decrease)
-	"""	
-	global dTdz_peaks
-	z_peak = []
-	T_peak = []
-	for i in range(0,m):
-		if (abs(gradient[i][1]-dt_av) > 3*std_dev) & (gradient[i][1] > 0):
-			z_peak.append(data[i][0])
-			T_peak.append(data[i][1])
-	if (len(z_peak) != 0):
-		dTdz_peaks = np.column_stack((z_peak,T_peak))
-		print(dTdz_peaks)
-		return(dTdz_peaks)
+		"""
+		Finding large peaks (3 std.dev away from average chosen arbitrarily, T must decrease)
+		"""	
+		global dTdz_peaks
+		z_peak = []
+		T_peak = []
+		for i in range(0,m):
+			if (abs(gradient[i][1]-dt_av) > threshold*std_dev) & (gradient[i][1] > 0):
+				z_peak.append(data[i][0])
+				T_peak.append(data[i][1])
+		if (len(z_peak) != 0):
+			dTdz_peaks = np.column_stack((z_peak,T_peak))
+			return(dTdz_peaks)
 
+		else:
+			return(0)
 	else:
-		print("No positive gradient peaks found")
 		return(0)
+
+# statistics for the spikes (independent)
+"""
+collect information about what is the best standard deviation threshold (function input) 
+to use to get the fewest false detections
+The match precision for a "good match" will be set to +- 5m in depth (chosen arbitrarily)
+Bad is if no match is detected or if difference is more than 5m
+"""
+def get_stats(data, gradient, threshold):
+	
+	# determining the depth of actual HB flag:
+	for i in range(0,len(flags.flag)):
+			if (flags.flag[i] == "HB"):
+				HB_depth = flags.depth[i]
+			else:
+ 				continue
+	
+	# calculate peak accuracy (spike function returns int 0 if no peak found)
+	spikes = spike(data, gradient, threshold) 
+	if (type(spikes) != int):
+		spike_depth = spikes[0][0]
+		difference = HB_depth - spike_depth
+	else:
+		difference = 999
+	
+	# categorising (1=good, 0=bad)
+	if (abs(difference) < 5):
+		spike_stats = 1
+	else:
+		spike_stats = 0
+
+	return(spike_stats)
 
 
 ######################################################################################################
@@ -242,7 +285,7 @@ for line in namefile:
 namefile.close()
 
 """
-Data that is available here after reading in the data (for each profile)
+Data that is available here after reading in the data (for each profile):
 df: flags (flags, depth)
 mat: data (z, T)
 mat: gradient (z, dTdz)
@@ -251,23 +294,65 @@ mat: secDer (d, d2Tdz2)
 var: latitude
 var: longitude 
 var: date
+
+Computation function outputs:
+mat/arr: dTdz_peaks (z, T)
 """
 
-# reading files
-for i in range(0,len(name_array)):
+# writing statistics data to file
+f = open('stats.txt','w')
+f.write("sigma,good,bad\n")
+good_spike = []
+bad_spike = []
+domain = []
 	
-	# reading in file here
-	filename = name_array[i]
-	read_data(filename)
-	plot_data(True)
-	spike(data, gradient)
+# reading files
+# collecting stats
+for j in range(2,6):
+	good = 0
+	bad = 0
+	print("Main loop: "+str(j))
+	
+	for i in range(0,len(name_array)):
+		
+		# reading in file here
+		filename = name_array[i]
+		print(i,filename)
+		read_data(filename)
+		#plot_data(False)
+		#spike(data, gradient, 3)
+	
+		# collecting statistics about spikes
+		if (get_stats(data, gradient, j) == 1):
+			good = good + 1
+		else: 
+			bad = bad + 1
+	
+	good_spike.append(good)
+	bad_spike.append(bad)
+	domain.append(j)
 
+	# printing header data
+	"""
 	print(str(filename)+"data:")
 	print("latitude: "+str(latitude))
 	print("longitude: "+str(longitude))
 	print("date: "+str(date))
 	print("flags:",flags.flag)
 	print("\n")
+	"""
+	f.write(str(j)+","+str(good)+","+str(bad)+"\n")
+
+width = 0.8
+plt.bar(domain,good_spike,width,alpha=0.8,label="good",color='g')
+plt.bar(domain,bad_spike,width,alpha=0.3,label="bad")
+plt.xlabel("sigma")
+plt.ylabel("Number of profiles")
+plt.title("Good and bad profiles with threshold chosen")
+plt.show()
+
+f.close()
+
 
 	
 ######################################################################################################

@@ -18,6 +18,7 @@ def read_data(filename, plot):
 	"""
 	Plot profiles if the "plot" input is equal to 1. For anything else, it will 
 	not plot the profile of temperature and depth		
+	Data will be stored in a python list (row major so the first index is the row)
 	"""
 	# read in files
 	f = open(filename,'r')
@@ -58,7 +59,7 @@ def read_data(filename, plot):
 	or above 50 degrees) and removes them from the data, storing it into a new array
 	"""
 	# User can change the global variables that are outputted if they wish
-	global data, gradient, n
+	global data, gradient
 
 	# taking temp and depth data
 	depth = []
@@ -72,17 +73,17 @@ def read_data(filename, plot):
 			temp.append(init_temp[i])
 	n = len(depth)
 	# writing all data to data frame
-	data = pd.DataFrame({"Depth":depth,"Temperature":temp})
+	data = np.column_stack((depth,temp))
 
 	# taking temperature gradient and depth data
 	dTdz = []
 	depth_grad = []
 	for jj in range(0,n-1):
-		depth_grad.append(data.Depth[jj])
-		dT = data.Temperature[jj+1]-data.Temperature[jj]
-		dz = data.Depth[jj+1]-data.Depth[jj]
+		depth_grad.append(data[jj][0])
+		dT = data[jj+1][1]-data[jj][1]
+		dz = data[jj+1][0]-data[jj][0]
 		dTdz.append(dT/dz)
-	gradient = pd.DataFrame({"z":depth_grad,"dTdz":dTdz})
+	gradient = np.column_stack((depth_grad,dTdz))
 
 	"""
 	# looking at the second derivative
@@ -90,10 +91,10 @@ def read_data(filename, plot):
 	depth_secgrad = []
 	global secDer
 	for jj in range(0,n-2):
-		depth_secgrad.append(gradient.z[jj])
-		der = float((gradient.dTdz[jj+1]-gradient.dTdz[jj])/(gradient.z[jj+1]-gradient.z[jj]))
+		depth_secgrad.append(gradient[jj][0])
+		der = float((gradient[jj+1][1]-gradient[jj][1])/(gradient[jj+1][1]-gradient[jj][1]))
 		d2Tdz2.append(der)
-	secDer = pd.DataFrame({"z":depth_secgrad,"d2Tdz2":d2Tdz2})
+	secDer = np.column_stack((depth_secgrad,d2Tdz2))
 	
 	# close file
 	dat.close()	
@@ -103,19 +104,19 @@ def read_data(filename, plot):
 	global dT9pt
 	depth_9pt = []
 	temp9pt = []
-	n = len(gradient.z)
+	n = len(gradient[:,0])
 	for jj in range(4,n-4):
-		depth_9pt.append(gradient.z[jj])
-		Tav = (gradient.dTdz[jj-4]+gradient.dTdz[jj-3]+gradient.dTdz[jj-2]+gradient.dTdz[jj-1]+gradient.dTdz[jj]+gradient.dTdz[jj+1]+gradient.dTdz[jj+2]+gradient.dTdz[jj+3]+gradient.dTdz[jj+4])/float(9.0)
+		depth_9pt.append(gradient[jj][0])
+		Tav = (gradient[jj-4][1]+gradient[jj-3][1]+gradient[jj-2][1]+gradient[jj-1][1]+gradient[jj][1]+gradient[jj+1][1]+gradient[jj+2][1]+gradient[jj+3][1]+gradient[jj+4][1])/float(9.0)
 		temp9pt.append(Tav)
-	T9pt = pd.DataFrame({"z":depth_9pt,"T_av":temp9pt})
+	T9pt = np.column_stack((depth_9pt,temp9pt))
 
 	# conditional subplot of temperature and gradient
 	if (plot == True):
 		# plotting temperature
 		plt.figure(figsize=(11.5,9))
 		plt.subplot(1,3,1)
-		plt.plot(data.Temperature,data.Depth)
+		plt.plot(data[:,1],data[:,0])
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature [degrees C]")
 		plt.gca().invert_yaxis()
@@ -128,7 +129,7 @@ def read_data(filename, plot):
  				continue
 		# plotting temperature gradient
 		plt.subplot(1,3,2)
-		plt.plot(gradient.dTdz, gradient.z)
+		plt.plot(gradient[:,1], gradient[:,0])
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature Gradient [degrees C/m]")
 		plt.gca().invert_yaxis()
@@ -141,7 +142,7 @@ def read_data(filename, plot):
  				continue
 		# plotting temperature gradient
 		plt.subplot(1,3,3)
-		plt.plot(T9pt.T_av, T9pt.z)
+		plt.plot(T9pt[:,1], T9pt[:,0])
 		plt.ylabel("Depth [m]")
 		plt.xlabel("T - 9pt moving av [degrees C]")
 		plt.gca().invert_yaxis()
@@ -154,13 +155,38 @@ def read_data(filename, plot):
  				continue
 		plt.suptitle("Temperature data for "+str(filename))
 		plt.show()
+	
 
 ############################################
 # Functions to identify features of the data
 
-# finding positive temperature increase spike at hit bottom
-def spike(temperature, depth):
-	print("hi")	
+# finding characteristic gradient increase spike for hit bottoms
+def spike(data, gradient):
+	"""
+	Using large positive gradient spikes to identify whether or not there is a peak
+	Wire breaks tend to have high temperature after gradient peak, so remove those
+	with higher temp after peak
+	Note that this is only to identify clear, large spikes in grad
+	Want to record numbers of spikes and the depth at the spike
+	"""
+	# importing key data from dataframes
+	n = len(data[:,1])
+	m = len(gradient[:,1])
+	
+	# calculate average gradient value
+	dt_av = sum(gradient[:,1])/float(m)
+
+	# calculate standard deviation in the gradient (average)
+	"""	
+	Note that this method of finding the standard deviation is not truly good for profiles
+	observable trends in dT (overall trend needs to be subtracted)
+	"""
+	sq_dev = 0
+	for i in range(0,m):
+		sq_dev = sq_dev + (dt_av - gradient[i][1])**2	
+	std_dev = np.sqrt(sq_dev/float(m))
+	
+
 
 ##########################################################################
 # computation
@@ -177,18 +203,33 @@ for line in namefile:
 	name_array.append(name)
 namefile.close()
 
+"""
+Data that is available here after reading in the data (for each profile)
+df: flags (flags, depth)
+mat: data (z, T)
+mat: gradient (z, dTdz)
+mat: T9pt (z, T_av)
+var: latitude
+var: longitude 
+var: date
+"""
+
 # reading files
 for i in range(0,len(name_array)):
 	
 	# reading in file here
 	filename = name_array[i]
-	read_data(filename, 1)
+	read_data(filename, 0)
+
+	spike(data, gradient)
 
 	print(str(filename))
 	print("latitude: "+str(latitude))
 	print("longitude: "+str(longitude))
+	print("date: "+str(date))
 	print("flags:",flags.flag)
 	print("\n")
+
 
 	
 ##########################################################################

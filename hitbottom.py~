@@ -189,7 +189,7 @@ to detect hit bottoms for XBT drops.
 def spike(data, gradient, threshold):
 	"""
 	Threshold is the number of standard deviations away from the mean gradient value you 
-	want to use for identifying a spike
+	want to use for identifying a spike (IDENTIFIED 3 IS MOST IDEAL)
 	Using large positive gradient spikes to identify whether or not there is a peak
 	Wire breaks tend to have high temperature after gradient peak, so remove those
 	with higher temp after peak
@@ -235,38 +235,6 @@ def spike(data, gradient, threshold):
 	else:
 		return(0)
 
-# statistics for the spikes (independent)
-"""
-collect information about what is the best standard deviation threshold (function input) 
-to use to get the fewest false detections
-The match precision for a "good match" will be set to +- 5m in depth (chosen arbitrarily)
-Bad is if no match is detected or if difference is more than 5m
-"""
-def get_stats(data, gradient, threshold):
-	
-	# determining the depth of actual HB flag:
-	for i in range(0,len(flags.flag)):
-			if (flags.flag[i] == "HB"):
-				HB_depth = flags.depth[i]
-			else:
- 				continue
-	
-	# calculate peak accuracy (spike function returns int 0 if no peak found)
-	spikes = spike(data, gradient, threshold) 
-	if (type(spikes) != int):
-		spike_depth = spikes[0][0]
-		difference = HB_depth - spike_depth
-	else:
-		difference = 999
-	
-	# categorising (1=good, 0=bad)
-	if (abs(difference) < 5):
-		spike_stats = 1
-	else:
-		spike_stats = 0
-
-	return(spike_stats)
-
 
 ######################################################################################################
 # computation (WHERE TO MANIPULATE TO USE CODES ABOVE)
@@ -299,38 +267,15 @@ Computation function outputs:
 mat/arr: dTdz_peaks (z, T)
 """
 
-# writing statistics data to file
-f = open('stats.txt','w')
-f.write("sigma,good,bad\n")
-good_spike = []
-bad_spike = []
-domain = []
-	
 # reading files
-# collecting stats
-for j in range(2,6):
-	good = 0
-	bad = 0
-	print("Main loop: "+str(j))
+for i in range(0,len(name_array)):
 	
-	for i in range(0,len(name_array)):
-		
-		# reading in file here
-		filename = name_array[i]
-		print(i,filename)
-		read_data(filename)
-		#plot_data(False)
-		#spike(data, gradient, 3)
-	
-		# collecting statistics about spikes
-		if (get_stats(data, gradient, j) == 1):
-			good = good + 1
-		else: 
-			bad = bad + 1
-	
-	good_spike.append(good)
-	bad_spike.append(bad)
-	domain.append(j)
+	# reading in file here
+	filename = name_array[i]
+	print(i,filename)
+	read_data(filename)
+	plot_data(True)
+	spike(data, gradient, 3)
 
 	# printing header data
 	"""
@@ -341,18 +286,6 @@ for j in range(2,6):
 	print("flags:",flags.flag)
 	print("\n")
 	"""
-	f.write(str(j)+","+str(good)+","+str(bad)+"\n")
-
-width = 0.8
-plt.bar(domain,good_spike,width,alpha=0.8,label="good",color='g')
-plt.bar(domain,bad_spike,width,alpha=0.3,label="bad")
-plt.xlabel("sigma")
-plt.ylabel("Number of profiles")
-plt.title("Good and bad profiles with threshold chosen")
-plt.show()
-
-f.close()
-
-
 	
+
 ######################################################################################################

@@ -4,6 +4,7 @@ This is a script to check the the profiles for hit bottoms based on:
  - large spikes in the temperature gradient (over 5 sigma)
  - consecutive constant temperatures (for after the hit bottom event)
  - steady increases in temperature
+ - bathymetry tests
 """
 ######################################################################################################
 # libraries
@@ -28,7 +29,6 @@ def read_data(filename):
 	Data will be stored in a python list (row major so the first index is the row)
 	"""
 	# read in files
-	f = open(filename,'r')
 	dat = Dataset(filename, 'r')
 	init_depth = dat.variables['Depthpress']
 	init_temp = dat.variables['Profparm']
@@ -142,7 +142,9 @@ def plot_data(plot):
 		consecpts = const_temp(data,gradient,75,0.001)
 		plt.plot(consecpts[:,1],consecpts[:,0],'go')
 		grow = temp_increase(data,50)
-		plt.plot(grow[:,1],grow[:,0],'bo')		
+		plt.plot(grow[:,1],grow[:,0],'bo')	
+		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
+		plt.axhline(y=bath_z, hold=None, color='g')	
 
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature [degrees C]")
@@ -185,6 +187,37 @@ def plot_data(plot):
 	else:
 		pass
 	
+# importing bathymetry data and using it as a test
+def bathymetry(filename):
+	"""
+	filename needs to be the directory and filename of the file you want to read (.nc file)
+	Note that the bathymetry data here also considers heights above the water too
+	This information is stored in a global data
+	"""
+	dat = Dataset(filename, 'r')
+	
+	# extracting key information
+	lon = dat.variables["lon"]
+	lat = dat.variables["lat"]
+	height = dat.variables["height"]
+	lon = np.squeeze(lon)		
+	lat = np.squeeze(lat)
+	height = np.squeeze(height)	
+	dat.close()
+
+	"""
+	height information is indexed such that each of the first indices is the lat
+	and the second index gives the longitude
+	"""
+	
+	# returning global variables
+	global bath_height, bath_lon, bath_lat
+	bath_height = height
+	bath_lon = lon
+	bath_lat = lat
+
+	return(0)
+
 
 ######################################################################################################
 # Computation functions
@@ -358,6 +391,38 @@ def temp_increase(data, consec_points):
 
 	return(temp_grow)
 
+# function to pull the height data from bathymetry to compare
+def bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height):
+	"""
+	Find the depth in the bathymetry data from the lat and long provided
+	Note that the longitude needs to be converted to 0-360 from -180-180
+	Fuction returns the depth
+	"""
+	# lengths of the two arrays
+	n1 = len(bath_lat)
+	n2 = len(bath_lon)
+	
+	# two for loops to find the appropriate lat and long
+	for i in range(0,n1-1):
+		if (latitude >= bath_lat[i]) & (latitude < bath_lat[i+1]):
+			i_cor = i
+		else:
+			continue
+	for j in range(0,n2-1):
+		# converting longitude to appropriate scale
+		if (longitude < 0):
+			longitude = 360.0+longitude
+		if (longitude >= bath_lon[j]) & (longitude < bath_lon[j+1]):
+			j_cor = j
+		else:
+			continue
+	
+	print(latitude,longitude)
+	# correct bathymetry value is returned heres
+	corr_depth = abs(bath_height[i_cor][j_cor])
+
+	return(corr_depth)
+	
 
 ######################################################################################################
 # computation (WHERE TO MANIPULATE TO USE CODES ABOVE)
@@ -376,12 +441,15 @@ for line in namefile:
 namefile.close()
 
 """
-Data that is available here after reading in the data (for each profile):
+Globally stored data that is available here after reading in the data (for each profile):
 df: flags (flags, depth)
 mat: data (z, T)
 mat: gradient (z, dTdz)
 mat: dT9pt (z, T_av)
 mat: secDer (d, d2Tdz2)
+list: bath_lon
+list: bath_lat
+mat: bath_height (lat, long)
 var: latitude
 var: longitude 
 var: date
@@ -392,14 +460,13 @@ mat/arr: const_consec (z,T)
 """
 
 # reading files
-for i in range(0,len(name_array)):
+for i in range(30,len(name_array)):
 	
 	# reading in file here
 	filename = name_array[i]
 	print(i,filename)
 	read_data(filename)
-	spike(data, gradient, 3)
-	const_temp(data, gradient, 10, 0.001)
+	bathymetry("../terrainbase.nc")
 	plot_data(True)
 
 

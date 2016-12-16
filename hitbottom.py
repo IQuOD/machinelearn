@@ -2,7 +2,8 @@
 """
 This is a script to check the the profiles for hit bottoms based on:
  - large spikes in the temperature gradient (over 5 sigma)
- - TBA
+ - consecutive constant temperatures (for after the hit bottom event)
+ - steady increases in temperature
 """
 ######################################################################################################
 # libraries
@@ -133,9 +134,16 @@ def plot_data(plot):
 		plt.figure(figsize=(11.5,9))
 		plt.subplot(1,3,1)
 		plt.plot(data[:,1],data[:,0])
+	
+		# plotting additonal features
 		spikes = spike(data,gradient, 3)
 		if (type(spikes) != int):
 			plt.plot(spikes[:,1], spikes[:,0],'ro')
+		consecpts = const_temp(data,gradient,75,0.001)
+		plt.plot(consecpts[:,1],consecpts[:,0],'go')
+		grow = temp_increase(data,50)
+		plt.plot(grow[:,1],grow[:,0],'bo')		
+
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature [degrees C]")
 		plt.gca().invert_yaxis()
@@ -188,14 +196,15 @@ to detect hit bottoms for XBT drops.
 # finding characteristic gradient increase spike for hit bottoms
 def spike(data, gradient, threshold):
 	"""
-	Threshold is the number of standard deviations away from the mean gradient value you 
+	threshold: is the number of standard deviations away from the mean gradient value you 
 	want to use for identifying a spike (IDENTIFIED 3 IS MOST IDEAL)
+	
 	Using large positive gradient spikes to identify whether or not there is a peak
 	Wire breaks tend to have high temperature after gradient peak, so remove those
 	with higher temp after peak
 	Note that this is only to identify clear, large spikes in grad (one property of HB data)
 	"""
-	# importing key data from dataframes
+	# importing key data from nested lists
 	n = len(data[:,1])
 	m = len(gradient[:,1])
 	
@@ -231,9 +240,123 @@ def spike(data, gradient, threshold):
 			return(dTdz_peaks)
 
 		else:
-			return(0)
+			return(999)
 	else:
-		return(0)
+		return(999)
+
+# function to check for consecutive constant temperatures
+def const_temp(data, gradient, consec_points, detection_threshold):
+	"""
+	consec_points: the number of points to count after the ith point (int)
+	detection_threshold: absolute detection threshold for gradient, percentage of mean for 
+						 temperature (float)
+
+	Going to check for constant temperatures by looking for points with consecutive
+	constant temperature and zero gradient. This will be done by averaging the ith point
+	and some number of points after, and consider constant if they are within a chosen
+	threshold (function input). Note that this will only detect the first instance the temperatures
+	become constant
+
+	returns the point where both the temperature and gradient stop fluctuating (both relatively
+	constant)
+	"""
+	# importing key data from nested lists
+	n = len(data[:,1])
+	m = len(gradient[:,1])
+
+	# global data
+	global const_consec
+	
+	# finding constant profiles in temperature list
+	const_temp = []
+	const_depth_init = []
+	for i in range(0,n-consec_points):
+		Tav_consec = 0
+		T_init = data[i][1]
+		z_init = data[i][0]
+		# counting the consecutive temperature values
+		for j in range(0,consec_points):
+			Tav_consec = Tav_consec + data[i+j][1]
+		# finding the average and seeing if it is within threshold of initial value
+		Tav_consec = Tav_consec/(float(consec_points))
+		var = detection_threshold*T_init
+		if (abs(Tav_consec - T_init) < var):
+			const_temp.append(T_init)
+			const_depth_init.append(z_init)
+		else: 
+			continue
+
+	# finding constant profiles in gradient list
+	const_dTdz = []
+	const_z_init = []
+	for i in range(0,m-consec_points):
+		dTav_consec = 0
+		dT_init = gradient[i][1]
+		z_init = gradient[i][0]	
+		# counting consecutive gradient values
+		for j in range(0,consec_points):
+			dTav_consec = dTav_consec + gradient[i+j][1]
+		# finding the average and seeing if it's within threshold
+		dTav_consec = dTav_consec/(float(consec_points))
+		if (abs(dTav_consec-dT_init) < detection_threshold):
+			const_dTdz.append(dT_init)
+			const_z_init.append(z_init)
+		else:
+			continue
+	
+	# looking for matching values in T and dTdz profiles (identifies only the first)
+	n1 = len(const_temp)
+	n2 = len(const_dTdz)
+	zvals = []
+	Tvals = [] 
+	for i in range(0,n1):	
+		for j in range(0,n2):
+			if (const_z_init[j] == const_depth_init[i]):
+				zvals.append(const_depth_init[i])
+				Tvals.append(const_temp[i])
+			else:
+				continue
+	const_consec = np.column_stack((zvals,Tvals))
+
+	return(const_consec)
+
+# function to check for steady temperature increases
+def temp_increase(data, consec_points):
+	"""
+	consec_points: number of points from the ith data point that need an 
+	increasing or equal temperature	
+	
+	Looking at temperature profiles for regions where the temperature increases steadily
+	(indicative of a hit bottom)
+	"""	
+	# length of data set 
+	n = len(data[:,0])
+	
+	# arrays for storing all increasing T and z values
+	global temp_grow
+	T_grow = []
+	z_grow = []
+
+	# for loop to iterate over depth values
+	for i in range(0,(n-consec_points)):
+		count = 0
+		for j in range(0, consec_points):
+			if (data[i][1] <= data[i+j][1]):
+				continue
+			else:
+				count = count + 1
+		if (count != 0):
+			continue
+		else:
+			zstart = data[i][0]
+			Tstart = data[i][1]
+		T_grow.append(Tstart)
+		z_grow.append(zstart)
+
+	# storing all together in nested list
+	temp_grow = np.column_stack((z_grow,T_grow))
+
+	return(temp_grow)
 
 
 ######################################################################################################
@@ -265,27 +388,19 @@ var: date
 
 Computation function outputs:
 mat/arr: dTdz_peaks (z, T)
+mat/arr: const_consec (z,T)
 """
 
 # reading files
-for i in range(1980,len(name_array)):
+for i in range(0,len(name_array)):
 	
 	# reading in file here
 	filename = name_array[i]
 	print(i,filename)
 	read_data(filename)
-	plot_data(True)
 	spike(data, gradient, 3)
+	const_temp(data, gradient, 10, 0.001)
+	plot_data(True)
 
-	# printing header data
-	"""
-	print(str(filename)+"data:")
-	print("latitude: "+str(latitude))
-	print("longitude: "+str(longitude))
-	print("date: "+str(date))
-	print("flags:",flags.flag)
-	print("\n")
-	"""
-	
 
 ######################################################################################################

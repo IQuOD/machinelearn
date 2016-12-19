@@ -139,9 +139,9 @@ def plot_data(plot):
 		spikes = spike(data,gradient, 3)
 		if (type(spikes) != int):
 			plt.plot(spikes[:,1], spikes[:,0],'ro')
-		consecpts = const_temp(data,gradient,75,0.001)
+		consecpts = const_temp(data,gradient,100,0.001)
 		plt.plot(consecpts[:,1],consecpts[:,0],'go')
-		grow = temp_increase(data,50)
+		grow = temp_increase(data,100)
 		plt.plot(grow[:,1],grow[:,0],'bo')	
 		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 		plt.axhline(y=bath_z, hold=None, color='g')	
@@ -417,7 +417,6 @@ def bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height):
 		else:
 			continue
 	
-	print(latitude,longitude)
 	# correct bathymetry value is returned heres
 	corr_depth = abs(bath_height[i_cor][j_cor])
 
@@ -460,7 +459,7 @@ mat/arr: const_consec (z,T)
 """
 
 # reading files
-for i in range(30,len(name_array)):
+for i in range(0,len(name_array)):
 	
 	# reading in file here
 	filename = name_array[i]

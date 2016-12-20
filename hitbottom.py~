@@ -1,9 +1,10 @@
 ######################################################################################################
 """
-This is a script to check the the profiles for hit bottoms based on:
+This is a script with functions to check the the profiles for hit bottoms based on:
  - large spikes in the temperature gradient (over 5 sigma)
  - consecutive constant temperatures (for after the hit bottom event)
  - steady increases in temperature
+ - small temperature increase spikes
  - bathymetry tests
 """
 ######################################################################################################
@@ -126,7 +127,7 @@ def read_data(filename):
 Input to the plot function is either True or False, where True will show the plots
 and False will not show the plots
 """
-def plot_data(plot):
+def plot_data(plot, filename):
 	
 	# conditional subplot of temperature and gradient
 	if (plot == True):
@@ -137,12 +138,12 @@ def plot_data(plot):
 	
 		# plotting additonal features
 		consecpts = const_temp(data,gradient,100,0.001)
-		#plt.plot(consecpts[:,1],consecpts[:,0],'go')
+		plt.plot(consecpts[:,1],consecpts[:,0],'go')
 		grow = temp_increase(data,50)
-		#plt.plot(grow[:,1],grow[:,0],'bo')	
+		plt.plot(grow[:,1],grow[:,0],'bo')	
 		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		#plt.axhline(y=bath_z, hold=None, color='g')	
-		spikes = spike(data,gradient, 3)
+		plt.axhline(y=bath_z, hold=None, color='g')	
+		spikes = grad_spike(data,gradient, 3)
 		if (type(spikes) != int):
 			plt.plot(spikes[:,1], spikes[:,0],'ro')
 		small_spikes = T_spike(data, 0.05)
@@ -226,10 +227,11 @@ def bathymetry(filename):
 """
 This section of code is a logic checking implementation to attempt 
 to detect hit bottoms for XBT drops.
+These should all return a list of points (and associated temperature values)s
 """
 
 # finding characteristic gradient increase spike for hit bottoms
-def spike(data, gradient, threshold):
+def grad_spike(data, gradient, threshold):
 	"""
 	threshold: is the number of standard deviations away from the mean gradient value you 
 	want to use for identifying a spike (IDENTIFIED 3 IS MOST IDEAL)
@@ -463,51 +465,5 @@ def T_spike(data, threshold):
 	
 	return(spikes)
 	
-
-######################################################################################################
-# computation (WHERE TO MANIPULATE TO USE CODES ABOVE)
-######################################################################################################
-
-# filename generation
-path = "../HBfiles/"
-
-# taking sample of files from the name file
-namefile = open("HB_content.txt","r")
-name_array = []
-for line in namefile:
-	line = line.rstrip()
-	name = str(path+line)
-	name_array.append(name)
-namefile.close()
-
-"""
-Globally stored data that is available here after reading in the data (for each profile):
-df: flags (flags, depth)
-mat: data (z, T)
-mat: gradient (z, dTdz)
-mat: dT9pt (z, T_av)
-mat: secDer (d, d2Tdz2)
-list: bath_lon
-list: bath_lat
-mat: bath_height (lat, long)
-var: latitude
-var: longitude 
-var: date
-
-Computation function outputs:
-mat/arr: dTdz_peaks (z, T)
-mat/arr: const_consec (z,T)
-"""
-
-# reading files
-for i in range(0,len(name_array)):
-	
-	# reading in file here
-	filename = name_array[i]
-	print(i,filename)
-	read_data(filename)
-	bathymetry("../terrainbase.nc")
-	plot_data(True)
-
 
 ######################################################################################################

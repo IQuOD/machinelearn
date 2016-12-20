@@ -85,51 +85,6 @@ print(tall_consec)
 ######################################################################################################
 
 
-def get_stats(data, gradient, consec_points, detection_threshold):
-	
-	# determining the depth of actual HB flag:
-	for i in range(0,len(flags.flag)):
-			if (flags.flag[i] == "HB"):
-				HB_depth = flags.depth[i]
-			else:
- 				continue
-	
-	try:
-		# calculate peak accuracy (spike function returns int 0 if no peak found)
-		peak = const_temp(data, gradient, consec_points, detection_threshold)
-		temp_stats = 0	
-	
-		for j in range(0,len(peak)):
-			difference = peak[j][0] - HB_depth
-			if (abs(difference) < 5):
-				temp_stats = temp_stats + 1
-	except:
-		temp_stats = 0
-		pass
-
-	return(temp_stats)
-
-# for loop to go over all data
-detection_threshold = np.logspace(-8,-1,8)
-all_count = []
-
-for j in range(0,len(detection_threshold)):
-	print(j)
-	total_count = 0 
-	for i in range(0,len(name_array)):
-		print(i)
-	
-		# reading in file here
-		filename = name_array[i]
-		read_data(filename)
-		total_count = total_count + get_stats(data, gradient, 100, detection_threshold[j])
-		
-	# store in bigger array to know which is best
-	all_count.append(total_count)
-
-# printing overall counts per number of consecutive points
-print(all_count)
-
 
 
 

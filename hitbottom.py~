@@ -136,15 +136,17 @@ def plot_data(plot):
 		plt.plot(data[:,1],data[:,0])
 	
 		# plotting additonal features
-		spikes = spike(data,gradient, 3)
-		if (type(spikes) != int):
-			plt.plot(spikes[:,1], spikes[:,0],'ro')
 		consecpts = const_temp(data,gradient,100,0.001)
-		plt.plot(consecpts[:,1],consecpts[:,0],'go')
-		grow = temp_increase(data,100)
-		plt.plot(grow[:,1],grow[:,0],'bo')	
+		#plt.plot(consecpts[:,1],consecpts[:,0],'go')
+		grow = temp_increase(data,50)
+		#plt.plot(grow[:,1],grow[:,0],'bo')	
 		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		plt.axhline(y=bath_z, hold=None, color='g')	
+		#plt.axhline(y=bath_z, hold=None, color='g')	
+		spikes = spike(data,gradient, 3)
+		#if (type(spikes) != int):
+		#	plt.plot(spikes[:,1], spikes[:,0],'ro')
+		small_spikes = T_spike(data, 0.05)
+		plt.plot(small_spikes[:,1],small_spikes[:,0],'yo')		
 
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature [degrees C]")
@@ -421,6 +423,45 @@ def bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height):
 	corr_depth = abs(bath_height[i_cor][j_cor])
 
 	return(corr_depth)
+
+# writing function to find small temperature spikes that may be indicative of a hit bottom
+def T_spike(data, threshold):
+	"""
+	The function takes in the data of temperature and depth and looks for a small
+	increase and immediate decrease in the temperature. Threshold is a measure of how 
+	much the temperature has to increase (and decrease) to count as a small spike
+	"""
+	# initialising arrays and length of loop
+	temp = data[:,1]
+	depths = data[:,0]
+	Tspike_z = []
+	Tspike_T = []
+	spikes = []
+	n = len(temp)
+
+	# for loop to identify points with spike
+	for i in range(0,n-2):
+		init = temp[i]
+		zinit = depths[i]
+		next = temp[i+1]
+		after = temp[i+2]
+		
+		# logic to find increase and decrease values
+		if (init < (next-threshold)):
+			if ((next-threshold) > after):
+				"""
+				These points meet the requirement that the initial value is lower than 
+				the next and that the value after is smaller again
+				"""
+				Tspike_T.append(init)
+				Tspike_z.append(zinit)
+			else:
+				continue
+		else:
+			continue
+	spikes = np.column_stack((Tspike_z,Tspike_T))
+	
+	return(spikes)
 	
 
 ######################################################################################################

@@ -137,11 +137,11 @@ def plot_data(plot):
 	
 		# plotting additonal features
 		consecpts = const_temp(data,gradient,100,0.001)
-		#plt.plot(consecpts[:,1],consecpts[:,0],'go')
+		plt.plot(consecpts[:,1],consecpts[:,0],'go')
 		grow = temp_increase(data,50)
-		#plt.plot(grow[:,1],grow[:,0],'bo')	
+		plt.plot(grow[:,1],grow[:,0],'bo')	
 		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		#plt.axhline(y=bath_z, hold=None, color='g')	
+		plt.axhline(y=bath_z, hold=None, color='g')	
 		spikes = spike(data,gradient, 3)
 		if (type(spikes) != int):
 			plt.plot(spikes[:,1], spikes[:,0],'ro')

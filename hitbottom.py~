@@ -143,8 +143,8 @@ def plot_data(plot):
 		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 		#plt.axhline(y=bath_z, hold=None, color='g')	
 		spikes = spike(data,gradient, 3)
-		#if (type(spikes) != int):
-		#	plt.plot(spikes[:,1], spikes[:,0],'ro')
+		if (type(spikes) != int):
+			plt.plot(spikes[:,1], spikes[:,0],'ro')
 		small_spikes = T_spike(data, 0.05)
 		plt.plot(small_spikes[:,1],small_spikes[:,0],'yo')		
 

@@ -73,15 +73,29 @@ for i in range(0,len(name_array)):
 	[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
 
 	# code for the points on the plot
+	"""
 	const = hb.const_temp(data, gradient, 100, 0.001)
 	inc = hb.temp_increase(data, 50)
 	error_pts = hb.concat(const, inc)
 	Tspike = hb.T_spike(data, 0.05)
 	dTspike = hb.grad_spike(data, gradient, 3)
 	pot_hb = hb.concat(Tspike,dTspike)
-	print(hb_depth)
 	bathydepth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, filename)
+	"""
+
+	# code for collecting statistics on the data
+	"""
+	code to take in the data and find the optimal values for the inputs to the functions
+	
+	Most ideal cases:
+	grad_spike: threshold = 3
+	Tspike: threshold = ?
+	temp_increase: consec_points = ?
+	const_temp: consec_points = ? threshold = ?
+	"""	
+	range_vals = np.logspace(-4,-1,4)
+	
 
 
 ######################################################################################################

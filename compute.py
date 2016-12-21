@@ -55,7 +55,7 @@ import hitbottom as hb
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("HB_content.txt","r")
+namefile = open("subsetHB.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -63,39 +63,146 @@ for line in namefile:
 	name_array.append(name)
 namefile.close()
 
-# reading files
-for i in range(0,len(name_array)):
-	
-	# reading in file here
-	filename = name_array[i]
-	print(i,filename)
-	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
-	[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+"""
+code to take in the data and find the optimal values for the inputs to the functions
 
-	# code for the points on the plot
-	"""
-	const = hb.const_temp(data, gradient, 100, 0.001)
-	inc = hb.temp_increase(data, 50)
-	error_pts = hb.concat(const, inc)
-	Tspike = hb.T_spike(data, 0.05)
-	dTspike = hb.grad_spike(data, gradient, 3)
-	pot_hb = hb.concat(Tspike,dTspike)
-	bathydepth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, filename)
-	"""
+Most ideal cases:
+grad_spike: threshold = 3
+T_spike: threshold = ?
+temp_increase: consec_points = ?
+const_temp: consec_points = ? threshold = ?
+"""
 
-	# code for collecting statistics on the data
-	"""
-	code to take in the data and find the optimal values for the inputs to the functions
+# code for collecting statistics on the data (optimisation)	
+
+"""
+# T_spike optimisation 
+f = open('stats_T_spike.txt','w')
+f.write('threshold,first_detect,total_close\n')
+print("Optimisation process for T_spike function parameters")
+range_vals = np.logspace(-4,-1,4)
+n = len(range_vals)
+
+# changing through detection threshold values
+for j in range(0,n):
+	detect_threshold = range_vals[j]
+	print("outer, detection threshold="+str(detect_threshold))
+	count_first = 0
+	count_overall = 0
 	
-	Most ideal cases:
-	grad_spike: threshold = 3
-	Tspike: threshold = ?
-	temp_increase: consec_points = ?
-	const_temp: consec_points = ? threshold = ?
-	"""	
-	range_vals = np.logspace(-4,-1,4)
+	# reading files
+	for i in range(0,len(name_array)):
 	
+		# reading in file here
+		filename = name_array[i]
+		print(i,filename)
+		[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
+		[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+		
+		# computing the points that will be used to compare
+		points = hb.T_spike(data,detect_threshold)	
+		if (len(points) > 1):
+			for k in range(0,len(points)): 
+				if (abs(points[k][0]-hb_depth) < 5):
+					count_overall = count_overall + 1
+					if (k == 0):
+						count_first = count_first + 1
+				else: 
+					continue
+		else:
+			try:
+				if (abs(points[0][0]-hb_depth) < 5):
+					count_overall = count_overall + 1
+					count_first = count_first + 1
+				else:
+					continue
+			except:
+				pass
+		
+	# recording information
+	f.write(str(detect_threshold)+","+str(count_first)+","+str(count_overall)+"\n")
+
+f.close()
+"""
+"""
+# temp_increase optimisation
+f = open('stats_temp_increase.txt','w')
+f.write('num_consec,above,below\n')
+print("Optimisation process for temp_increase function parameters")
+consec_range = np.arange(50,270,20)
+m = len(consec_range)
+
+# changing through detection threshold values
+for j in range(0,m):
+	consec_points = consec_range[j]
+	print("outer, consecutive points="+str(consec_points))
+	above = 0
+	below = 0
+	
+	# reading files
+	for i in range(0,len(name_array)):
+	
+		# reading in file here
+		filename = name_array[i]
+		print(i,filename)
+		[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
+		[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+		
+		# computing the points that will be used to compare
+		points = hb.temp_increase(data,consec_points)	
+		for k in range(0,len(points)):
+			if (points[k][0] < hb_depth):
+				above = above + 1
+			else:
+				below = below + 1
+		
+	# recording information
+	f.write(str(consec_points)+","+str(above)+","+str(below)+"\n")
+
+f.close()
+"""
+
+# const_temp optimisation
+f = open('stats_const_temp.txt','w')
+f.write("consec_pts,threshold,above,below\n")
+print("Optimisation process for const_temp function parameters")
+consec_range = np.arange(50,270,20)
+threshold_range = np.logspace(-5,-1,5)
+m1 = len(consec_range)
+m2 = len(threshold_range)
+
+# changing through detection threshold values
+for ii in range(0,m1):
+	consec_points = consec_range[ii]
+	print("outer, consecutive points="+str(consec_points))
+	for j in range(0,m2):
+		threshold = threshold_range[j]
+		print("more outer, threshold="+str(threshold))
+		above = 0
+		below = 0
+	
+		# reading files
+		for i in range(0,len(name_array)):
+	
+			# reading in file here
+			filename = name_array[i]
+			print(i,filename)
+
+			[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
+			[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+		
+			# computing the points that will be used to compare
+			points = hb.const_temp(data, gradient, consec_points, threshold)	
+			for k in range(0,len(points)):
+				if (points[k][0] < hb_depth):
+					above = above + 1
+				else:
+					below = below + 1
+		
+		# recording information
+		f.write(str(consec_points)+","+str(threshold)+","+str(above)+","+str(below)+"\n")	
+
+f.close()
 
 
 ######################################################################################################

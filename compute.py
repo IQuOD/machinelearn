@@ -55,7 +55,7 @@ import hitbottom as hb
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("subsetHB.txt","r")
+namefile = open("HB_content.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -75,7 +75,60 @@ const_temp: consec_points = ? threshold = ?
 
 # code for collecting statistics on the data (optimisation)	
 
-"""
+
+# grad_spike optimisation 
+f = open('stats_grad_spike.txt','w')
+f.write('sigma,first_detect,total_close\n')
+print("Optimisation process for grad_spike function parameters")
+range_vals = np.arange(1,9,1)
+n = len(range_vals)
+
+# changing through detection threshold values
+for j in range(0,n):
+	detect_threshold = range_vals[j]
+	print("outer, detection threshold="+str(detect_threshold))
+	count_first = 0
+	count_overall = 0
+	
+	# reading files
+	for i in range(0,len(name_array)):
+	
+		# reading in file here
+		filename = name_array[i]
+
+		print(i,filename)
+		[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
+		[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+		
+		# computing the points that will be used to compare
+		points = hb.grad_spike(data,gradient,detect_threshold)	
+		if (type(points) == int):
+			continue
+		else:
+			if (len(points) > 1):
+				for k in range(0,len(points)): 
+					if (abs(points[k][0]-hb_depth) < 5):
+						count_overall = count_overall + 1
+						if (k == 0):
+							count_first = count_first + 1
+					else: 
+						continue
+			else:
+				try:
+					if (abs(points[0][0]-hb_depth) < 5):
+						count_overall = count_overall + 1
+						count_first = count_first + 1
+					else:
+						continue
+				except:
+					pass
+		
+	# recording information
+	f.write(str(detect_threshold)+","+str(count_first)+","+str(count_overall)+"\n")
+
+f.close()
+
+
 # T_spike optimisation 
 f = open('stats_T_spike.txt','w')
 f.write('threshold,first_detect,total_close\n')
@@ -123,8 +176,8 @@ for j in range(0,n):
 	f.write(str(detect_threshold)+","+str(count_first)+","+str(count_overall)+"\n")
 
 f.close()
-"""
-"""
+
+
 # temp_increase optimisation
 f = open('stats_temp_increase.txt','w')
 f.write('num_consec,above,below\n')
@@ -160,7 +213,7 @@ for j in range(0,m):
 	f.write(str(consec_points)+","+str(above)+","+str(below)+"\n")
 
 f.close()
-"""
+
 
 # const_temp optimisation
 f = open('stats_const_temp.txt','w')
@@ -203,6 +256,7 @@ for ii in range(0,m1):
 		f.write(str(consec_points)+","+str(threshold)+","+str(above)+","+str(below)+"\n")	
 
 f.close()
+
 
 
 ######################################################################################################

@@ -33,7 +33,6 @@ def read_data(filename):
 	dat = Dataset(filename, 'r')
 	init_depth = dat.variables['Depthpress']
 	init_temp = dat.variables['Profparm']
-	global flags
 	Act_Code = np.squeeze(dat.variables["Act_Code"])
 	Aux_ID = np.squeeze(dat.variables["Aux_ID"])
 
@@ -47,8 +46,13 @@ def read_data(filename):
 			QCdepths.append(float(Aux_ID[i]))
 	flags = pd.DataFrame({"flag":QCflags,"depth":QCdepths})
 
+	# pulling the hit bottom depth out of the flags
+	hb_depth = 0
+	for i in range(0,len(flags.flag)):
+		if (flags.flag[i] == "HB"):
+			hb_depth = flags.depth[i]
+
 	# choose variables that you want to import (other than T and z) here:
-	global latitude, longitude, date
 	latitude = dat.variables['latitude']
 	longitude = dat.variables['longitude']
 	date = dat.variables['woce_date']
@@ -66,8 +70,6 @@ def read_data(filename):
 	This section of code takes temperature values that are non-physical (negative
 	or above 50 degrees) and removes them from the data, storing it into a new array
 	"""
-	# User can change the global variables that are outputted if they wish
-	global data, gradient
 
 	# taking temp and depth data
 	depth = []
@@ -97,62 +99,36 @@ def read_data(filename):
 		dz = data[jj+1][0]-data[jj][0]
 		dTdz.append(dT/dz)
 	gradient = np.column_stack((depth_grad,dTdz))
-
-	# looking at the second derivative
-	d2Tdz2 = []
-	depth_secgrad = []
-	global secDer
-	for jj in range(0,n-2):
-		depth_secgrad.append(gradient[jj][0])
-		der = float((gradient[jj+1][1]-gradient[jj][1])/(gradient[jj+1][1]-gradient[jj][1]))
-		d2Tdz2.append(der)
-	secDer = np.column_stack((depth_secgrad,d2Tdz2))
-
-	# taking a moving average for the temperature values
-	global dT9pt
-	depth_9pt = []
-	temp9pt = []
-	n = len(gradient[:,0])
-	for jj in range(4,n-4):
-		depth_9pt.append(gradient[jj][0])
-		Tav = (gradient[jj-4][1]+gradient[jj-3][1]+gradient[jj-2][1]+gradient[jj-1][1]+gradient[jj][1]+gradient[jj+1][1]+gradient[jj+2][1]+gradient[jj+3][1]+gradient[jj+4][1])/float(9.0)
-		temp9pt.append(Tav)
-	dT9pt = np.column_stack((depth_9pt,temp9pt))
 	
 	# close file
-	dat.close()	
+	dat.close()
+	return(data, gradient, flags, hb_depth, latitude, longitude, date)
 
 # defining a function for plotting the data
 """
 Input to the plot function is either True or False, where True will show the plots
 and False will not show the plots
 """
-def plot_data(plot, filename):
+def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filename):
 	
 	# conditional subplot of temperature and gradient
 	if (plot == True):
 		# plotting temperature
 		plt.figure(figsize=(11.5,9))
-		plt.subplot(1,3,1)
+		plt.subplot(1,2,1)
 		plt.plot(data[:,1],data[:,0])
 	
-		# plotting additonal features
-		consecpts = const_temp(data,gradient,100,0.001)
-		plt.plot(consecpts[:,1],consecpts[:,0],'go')
-		grow = temp_increase(data,50)
-		plt.plot(grow[:,1],grow[:,0],'bo')	
-		bath_z = bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		plt.axhline(y=bath_z, hold=None, color='g')	
-		spikes = grad_spike(data,gradient, 3)
-		if (type(spikes) != int):
-			plt.plot(spikes[:,1], spikes[:,0],'ro')
-		small_spikes = T_spike(data, 0.05)
-		plt.plot(small_spikes[:,1],small_spikes[:,0],'yo')		
+		# plotting "bad data" 
+		plt.plot(error_pts[:,1],error_pts[:,0],'bo')	
+
+		# plotting the points of potential HB event
+		plt.plot(pot_hb[:,1],pot_hb[:,0],'ro')
 
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature [degrees C]")
 		plt.gca().invert_yaxis()
 		plt.title("T")
+		plt.axhline(y=bathydepth, hold=None, color='g')	
 		for i in range(0,len(flags.flag)):
 			if (flags.flag[i] == "HB"):
 				ref = flags.depth[i]
@@ -160,25 +136,13 @@ def plot_data(plot, filename):
 			else:
  				continue
 		# plotting temperature gradient
-		plt.subplot(1,3,2)
+		plt.subplot(1,2,2)
 		plt.plot(gradient[:,1], gradient[:,0])
 		plt.ylabel("Depth [m]")
 		plt.xlabel("Temperature Gradient [degrees C/m]")
 		plt.gca().invert_yaxis()
-		plt.title("dTdz")
-		for i in range(0,len(flags.flag)):
-			if (flags.flag[i] == "HB"):
-				ref = flags.depth[i]
-				plt.axhline(y=ref, hold=None, color='r')
-			else:
- 				continue
-		# plotting temperature 9 point moving average
-		plt.subplot(1,3,3)
-		plt.plot(dT9pt[:,1], dT9pt[:,0])
-		plt.ylabel("Depth [m]")
-		plt.xlabel("T - 9pt moving av [degrees C]")
-		plt.gca().invert_yaxis()
-		plt.title("T 9pt MA")
+		plt.title("dTdz")	
+		plt.axhline(y=bathydepth, hold=None, color='g')	
 		for i in range(0,len(flags.flag)):
 			if (flags.flag[i] == "HB"):
 				ref = flags.depth[i]
@@ -214,12 +178,34 @@ def bathymetry(filename):
 	"""
 	
 	# returning global variables
-	global bath_height, bath_lon, bath_lat
 	bath_height = height
 	bath_lon = lon
 	bath_lat = lat
 
-	return(0)
+	return(bath_height, bath_lon, bath_lat)
+
+# function to join the arrays of data available
+def concat(*args):
+	try:
+		if (type(args[0]) == type(np.array([0,0]))):
+			array = args[0]
+			for i in range(1,len(args)):
+				if (type(args[i]) == type(np.array([0,0]))):
+					array = np.concatenate((array,args[i]),axis=0)
+				else:
+					continue
+		else:
+			array = args[1]
+			for i in range(1,len(args)):
+				if (type(args[i]) == type(np.array([0,0]))):
+					array = np.concatenate((array,args[i]),axis=0)
+				else:
+					continue
+	except:
+		array = np.array([[0,0]])
+		pass
+
+	return(array)
 
 
 ######################################################################################################

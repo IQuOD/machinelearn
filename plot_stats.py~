@@ -13,6 +13,93 @@ from mpl_toolkits.mplot3d import Axes3D
 ######################################################################################################
 # reading in files and creating plots
 
+# temperature spike statistics
+dat= []
+with open('stats_T_spike.txt') as f:
+	next(f)
+	for line in f:
+		dat.append([float(x.strip()) for x in line.split(',')])
+		
+first = []
+total = []
+frac = []
+domain = []
+for i in range(0,len(dat)):
+	fraction = dat[i][1]/dat[i][2]
+	frac.append(fraction)
+	domain.append(dat[i][0])
+	first.append(dat[i][1])
+	total.append(dat[i][2])
+
+# plotting bar graph of the number of detections against total number
+plt.plot(domain, first)
+plt.xscale('log')
+plt.title("Temperature spike - Num. first point within 5m of the HB")
+plt.ylabel("Number of points")
+plt.xlabel("Threshold (for detection)")
+plt.show()
+
+plt.plot(domain, total)
+plt.xscale('log')
+plt.title("Temperature spike - Points within HB zone")
+plt.ylabel("Number of points")
+plt.xlabel("Threshold (for detection)")
+plt.show()
+
+plt.plot(domain,frac)
+plt.xscale('log')
+plt.title("Temperature spike - fraction of points at HB to points in HB region")
+plt.xlabel("Threshold (for detection)")
+plt.ylabel("Percentage (decimal)")
+plt.show()
+
+f.close()
+
+
+######################################################################################################
+
+# gradient spike statistics
+dat= []
+with open('stats_grad_spike.txt') as f:
+	next(f)
+	for line in f:
+		dat.append([float(x.strip()) for x in line.split(',')])
+		
+first = []
+total = []
+frac = []
+domain = []
+for i in range(0,len(dat)):
+	fraction = dat[i][1]/dat[i][2]
+	frac.append(fraction)
+	domain.append(dat[i][0])
+	first.append(dat[i][1])
+	total.append(dat[i][2])
+
+# plotting bar graph of the number of detections against total number
+plt.bar(domain, first, alpha=0.5)
+plt.title("Gradient spike - Num. first point within 5m of the HB")
+plt.ylabel("Number of points")
+plt.xlabel("Sigma (detection threshold)")
+plt.show()
+
+plt.bar(domain, total, alpha=0.5)
+plt.title("Gradient spike - Points within HB zone (pm 5m)")
+plt.ylabel("Number of points")
+plt.xlabel("Sigma (detection threshold)")
+plt.show()
+
+plt.plot(domain,frac)
+plt.title("Gradient spike - fraction of points at HB to points in HB region")
+plt.xlabel("Sigma (detection threshold)")
+plt.ylabel("Percentage (decimal)")
+plt.show()
+
+f.close()
+
+
+######################################################################################################
+
 # constant temperature stats
 dat = []
 with open('stats_const_temp.txt') as f:

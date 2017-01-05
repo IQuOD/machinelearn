@@ -70,7 +70,7 @@ total = []
 frac = []
 domain = []
 for i in range(0,len(dat)):
-	fraction = dat[i][1]/dat[i][2]
+	fraction = dat[i][1]*dat[i][2]/(dat[i][1]+dat[i][2])
 	frac.append(fraction)
 	domain.append(dat[i][0])
 	first.append(dat[i][1])
@@ -89,7 +89,7 @@ plt.ylabel("Number of points")
 plt.xlabel("Sigma (detection threshold)")
 plt.show()
 
-plt.plot(domain,frac)
+plt.plot(domain, frac)
 plt.title("Gradient spike - fraction of points at HB to points in HB region")
 plt.xlabel("Sigma (detection threshold)")
 plt.ylabel("Percentage (decimal)")

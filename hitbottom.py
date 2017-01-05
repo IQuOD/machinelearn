@@ -453,3 +453,150 @@ def T_spike(data, threshold):
 	
 
 ######################################################################################################
+
+# code for finding the depth of the hit bottom given the predicted hit bottom data
+def hit_predict(data, error_pts, pot_hb, bad_points, fraction, fracAbove, hb_depth):
+	"""
+	Writing a function to collect all of the points and determine the values of 3 key parameters
+	that optimise the detection efficiency (true positive rate)
+	
+	function inputs:
+	bad_points - number of points after a given depth that we will look for bad points
+	fraction - fraction of points required (in the bad_points range) to consider the initial 
+			   point to be the "detected" hit bottom
+	fracAbove - if we're using the blue points (pot_hb points not meeting criteria for a hit 
+				bottom) then look at the fraction of points above and below (given as below/total)
+				and use as a metric to determine whether or not a given "blue" point can be
+				flagged as the hit bottom
+	(other function inputs are defined earlier)
+	
+	function returns:
+	predicted depth of hit bottom
+
+	function edit - only working on the points with potential hit bottom points at the top
+	"""
+	n = len(data)
+	all_data = concat(error_pts, pot_hb)
+	predHB = 0
+	
+	if (len(pot_hb) >= 1):
+	# trying this code only on those with potential hit bottom points
+
+		try:
+			# if we have an array of values for the potential hit bottom
+			if (type(pot_hb) == type(np.array([[0,0]]))):
+				#print("array of HB points found")
+				# first look through the potential hit bottom points
+				if (len(pot_hb) >= 1):	
+					#print("long array of pot_hb")
+					for j in range(0,len(pot_hb)):	
+	
+						# find correct index
+						eq_index = 0
+						for i in range(0,n):
+							if (pot_hb[j][0]==data[i][0]):
+								eq_index = i
+							else:
+								continue
+				
+						# count the number of bad points within range
+						count = 0
+						for i in range(eq_index,eq_index+bad_points):
+							for k in range(0,len(error_pts)):	
+								if (data[i][0] == error_pts[k][0]):
+									count = count +1 
+								else:	
+									continue
+				
+						# computing fraction of points detected required
+						frac = count/float(len(error_pts))
+						if (frac >= fraction):
+							predHB = pot_hb[j][0]
+							break
+
+				else:
+					#print("pot_hb only one entry")
+					# find correct index
+					eq_index = 0
+					for i in range(0,n):
+						if (pot_hb[0][0]==data[i][0]):
+							eq_index = i
+
+					# count the number of bad points within
+					count = 0
+					for i in range(eq_index,eq_index+bad_points):
+						for k in range(0,len(error_pts)):	
+							if (data[i][0] == error_pts[k][0]):
+								count = count +1 
+							else:	
+								continue
+
+					# computing fraction of points detected required
+					frac = count/float(len(error_pts))
+					if (frac > fraction):
+						predHB = pot_hb[0][0]
+				
+					"""
+					# try all error points to find location	of hit bottom
+					else:
+						print("one entry is no good - going to look through error_pts")
+						for j in range(0,len(error_pts)):
+							print(str(j))
+							below = 0
+							# find correct index
+							eq_index = 0
+							for i in range(0,n):
+								if (error_pts[j][0]==data[i][0]):
+									eq_index = i
+								else:
+									continue
+					
+							for i in range(eq_index,n):
+								for k in range(0,len(error_pts)):
+									if (error_pts[k][0] == data[i][0]):
+										below = below + 1
+									else:
+										continue
+							frac_above = below/float(len(error_pts))
+							if (frac_above > fracAbove):
+								predHB = error_pts[j][0]
+							else: 
+								continue		
+						"""
+			"""
+			# if there is no predicted hit bottom location (try each point of the error points)
+			else:	
+				print("no potential hb points found - looking through error points")
+				for j in range(0,len(error_pts)):
+					print(str(j))
+					below = 0
+					# find correct index
+					eq_index = 0
+					for i in range(0,n):
+						if (error_pts[j][0]==data[i][0]):
+							eq_index = i
+						else:
+							continue
+
+					for i in range(eq_index,n):
+						for k in range(0,len(error_pts)):
+							if (error_pts[k][0] == data[i][0]):
+								below = below + 1
+							else:
+								continue
+					frac_above = below/float(len(error_pts))
+					if (frac_above > fracAbove):
+						predHB = error_pts[j][0]
+					else: 
+						continue
+				"""
+
+		except:
+			predHB = 0
+			pass
+
+	return(predHB)
+
+
+
+######################################################################################################

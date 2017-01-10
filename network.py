@@ -205,7 +205,7 @@ def partition (alist,first,last):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("subsetHB.txt","r")
+namefile = open("HBcontent.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -238,9 +238,9 @@ n = len(name_array)
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
 
-for i in range(0,5):
+for i in range(0,n):
 	filename = name_array[i]
-	print(i,filename)
+	print("Iterating through file "+str(i)+" ("+str(filename)+"):")
 	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
 	
 	# getting all of the potential error points
@@ -255,7 +255,6 @@ for i in range(0,5):
 	
 	# looping through each data point
 	m = len(bad_data[:,0])
-	print("Iterating through file "+str(i)+":")
 	for j in range(0,m):
 		bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 		[HBpoint, dev, fraction, zdiff] = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth) 

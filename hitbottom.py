@@ -455,7 +455,7 @@ def T_spike(data, threshold):
 ######################################################################################################
 
 # code for finding the depth of the hit bottom given the predicted hit bottom data
-def hit_predict(data, error_pts, pot_hb, bad_points, fraction, fracAbove, hb_depth):
+def hit_predict(data, error_pts, pot_hb, bad_points, fraction, hb_depth):
 	"""
 	Writing a function to collect all of the points and determine the values of 3 key parameters
 	that optimise the detection efficiency (true positive rate)

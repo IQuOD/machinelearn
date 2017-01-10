@@ -263,59 +263,57 @@ f.close()
 # code for assessing success of program
 
 # writing to file
-f = open("hb_wpothb_success.txt","w")
-f.write("bad_points,fraction,fracAbove,num_detected,frac_detected\n")
+f = open("hb_wpothb.txt","w")
+f.write("bad_points,fraction,fracAbove,num_detected\n")
 
 bad_points = np.arange(25,205,5)
-fraction = np.arange(0.02,1,0.02)
-fracAbove = np.arange(0.02,0.5,0.02)
+fraction = np.arange(0.1,1,0.05)
 
 m1 = len(bad_points)
 m2 = len(fraction)
-m3 = len(fracAbove)
+[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
 
 for j1 in range(0,m1):
-	print("points ="+str(bad_points[j1]))
 	for j2 in range(0,m2):
-		print("fraction="+str(fraction[j2]))
-		for j3 in range(0,m3):
-			print("fracAbove="+str(fracAbove[j3]))
-			# reading files
-			n = len(name_array)
-			for i in range(0,n):
+		print("points = "+str(bad_points[j1]))
+		print("fraction = "+str(fraction[j2]))
 
-				# reading in file here
-				filename = name_array[i]
-				count = 0
-				predict_correctly = 0
+		# reading files
+		n = len(name_array)
+		for i in range(0,n):
 
-				print(i,filename)
-				[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
-				[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
-	
-				# function inputs
-				const = hb.const_temp(data, gradient, 100, 0.001)
-				inc = hb.temp_increase(data, 50)
-				error_pts = hb.concat(const, inc)
-				Tspike = hb.T_spike(data, 0.05)
-				dTspike = hb.grad_spike(data, gradient, 3)
-				pot_hb = hb.concat(Tspike,dTspike)
+			# reading in file here
+			filename = name_array[i]
+			count = 0
+			predict_correctly = 0
+
+			# read profile at the start (and store all in memory)
+			print(i,filename)
+			[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
+
+			# function inputs
+			const = hb.const_temp(data, gradient, 100, 0.001)
+			inc = hb.temp_increase(data, 50)
+			error_pts = hb.concat(const, inc)
+			Tspike = hb.T_spike(data, 0.05)
+			dTspike = hb.grad_spike(data, gradient, 3)
+			pot_hb = hb.concat(Tspike,dTspike)
+
+			# condition to only count the profiles that have predicted hit bottoms (red points)
+			if (type(pot_hb) == type(error_pts)):
 
 				# counting script and printing to check
-				predict_depth = hb.hit_predict(data, error_pts, pot_hb, bad_points[j1], fraction[j2], fracAbove[j3], hb_depth)
-
-				if (predict_depth == hb_depth):
-					continue
-
+				predict_depth = hb.hit_predict(data, error_pts, pot_hb, bad_points[j1], fraction[j2], hb_depth)
 				count = count + 1
 				print(abs(predict_depth - hb_depth))
-				if (abs(predict_depth - hb_depth) < 10):
+				if (abs(predict_depth - hb_depth) < 5):
 					predict_correctly = predict_correctly + 1
 
-			# collecting key stats
-			num_detected = predict_correctly
-			frac_detected = num_detected/count
-			f.write(str(bad_points[j1])+","+str(fraction[j2])+","+str(fracAbove[j3])+","+str(num_detected)+","+str(frac_detected))
+		# collecting key stats
+		num_detected = predict_correctly
+		frac_detected = num_detected/count
+		f.write(str(bad_points[j1])+","+str(fraction[j2])+","+str(num_detected)+"\n")
+		print("\n")
 
 f.close()
 

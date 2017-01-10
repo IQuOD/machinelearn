@@ -55,7 +55,7 @@ import hitbottom as hb
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("HB_content.txt","r")
+namefile = open("subsetHB.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()

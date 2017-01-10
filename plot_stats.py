@@ -12,7 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 ######################################################################################################
 # reading in files and creating plots
-
+"""
 # temperature spike statistics
 dat= []
 with open('stats_T_spike.txt') as f:
@@ -173,6 +173,12 @@ plt.ylabel("Percentage (below HB points/total points)")
 plt.show()
 
 f.close()
+"""
+
+######################################################################################################
+
+# optimisation code read
+
 
 
 ######################################################################################################

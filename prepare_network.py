@@ -41,6 +41,7 @@ Reading files or plotting (non-computational):
 import numpy as np
 import pandas as pd
 import hitbottom as hb
+import scipy.optimize as op
 import math
 import os.path
 import matplotlib.pyplot as plt
@@ -135,7 +136,8 @@ def prepare_network(ii, bad_data, gradSpike, TSpike, data, gradient, bathy_depth
 	else:
 		dev = math.floor(gradDiff)
 	
-	return(HBpoint, dev, fraction, zdiff)
+	return([HBpoint, dev, fraction, zdiff])
+		
 
 # algorithm to remove repeats and sort based on depth
 def sortPls(array):
@@ -162,6 +164,43 @@ def sortPls(array):
 	quickSort(lifeSorted[:,0])
 
 	return(lifeSorted)
+
+
+# defining function to extract expected output (for neural network training)
+def nn_out(bad_data, HBdepth, j):
+	""" 
+	This finds the single point in the profile with the smallest distance to the true hit bottom
+	point (assuming it is within some threshold, otherwise it will return no good detections) and
+	returns a list of those points as the expected outputs	
+	"""
+	# finding index of point that is closest to the HB point
+	m = len(bad_data)	
+	index = 0
+	dist = 999
+	for i in range(0,m):
+		newdist = abs(bad_data[i][0] - HBdepth)
+		if (newdist < dist):
+			index = i
+			dist = newdist
+			# chosing the point above if they are close to equidistant			
+			if (abs(abs(HBdepth-bad_data[index][0])-abs(HBdepth-bad_data[index-1][0])) < 0.1):
+				index = index - 1
+		else:
+			continue
+
+	# giving value of point closest to true HB depth a value of 1
+	outputs = []
+	for i in range(0,m):
+		if (i == index):
+			outputs.append(1)
+		else:
+			outputs.append(0) 
+	
+	# returning the output value of the point in the profile indexed above
+	nnOutput = outputs[j]	
+
+	return(nnOutput)
+
 
 # sorting algorithms 
 """
@@ -205,7 +244,7 @@ def partition (alist,first,last):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("HBcontent.txt","r")
+namefile = open("HBfiles_golden.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -215,7 +254,7 @@ namefile.close()
 
 
 ######################################################################################################
-# writing neural network
+# writing code to prepare the neural network inputs
 
 """
 INPUTS:
@@ -235,8 +274,15 @@ OUTPUTS:
 # checking code
 n = len(name_array)
 
+# writing to file
+f = open('nn_training_data.txt','w')
+f.write('expected_output,HBpoint,dev,fraction,zdiff\n')
+
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
+
+# creating the weights and architecture for the neural network
+net = neuralNet([4,5,1])
 
 for i in range(0,n):
 	filename = name_array[i]
@@ -257,11 +303,22 @@ for i in range(0,n):
 	m = len(bad_data[:,0])
 	for j in range(0,m):
 		bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		[HBpoint, dev, fraction, zdiff] = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth) 
-		if (HBpoint == 1):
-			print([HBpoint, dev, fraction, zdiff])
-		# output should follow: [HBpoint, dev, fraction, zdiff]
+		
+		# these are the neural network inputs and outputs
+		nnInput = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth)
+		nnInput = feature_scaling(nnInput)
+		nnOutput = nn_out(bad_data, hb_depth, j)
+		if (nnOutput == 1):		
+			print(nnOutput, nnInput)
+		
+		# writing parameters to file
+		f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+',' \
+				+str(nnInput[2])+','+str(nnInput[3])+'\n')	
+
+
 	print("\n")
 
+# completed writing parameters from the training set
+f.close()
 
 ######################################################################################################

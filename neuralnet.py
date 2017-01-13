@@ -132,12 +132,26 @@ class neuralNet:
 ######################################################################################################
 # reading in neural network input parameters
 
+'''
+features: HBpoint, grad deviation from mean (#std.dev), fraction above:below, zdiff
+y: expected output based on the 
+'''
 
+features = []
+y = []
 
+with open('nn_training_data.txt') as f:
+	next(f)
+	for line in f:
+		line = line.split(',')
+		y.append(int(line[0]))
+		features.append([int(line[1]),float(line[2]),float(line[3]),float(line[4].replace('\n',''))])
+	
+features = np.array(features)
+y = np.array(y)
 
-
-
-
+for i in range(0,len(features)):
+	print(y[i], features[i])
 
 
 

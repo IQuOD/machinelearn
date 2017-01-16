@@ -42,6 +42,7 @@ import numpy as np
 import pandas as pd
 import hitbottom as hb
 import scipy.optimize as op
+import neuralnet as nn
 import math
 import os.path
 import matplotlib.pyplot as plt
@@ -78,6 +79,10 @@ def prepare_network(ii, bad_data, gradSpike, TSpike, data, gradient, bathy_depth
 	for i in range(0,len(gradient)):
 		stdDev = stdDev + abs(gradient[i][1] - mean)**2
 	stdDev = stdDev/len(gradient[:,1])	
+	
+	# code to check that the standard deviation is not 0
+	if (stdDev == 0):
+		stdDev = 0.001
 	
 	# gradient at this point
 	grad = 0
@@ -128,13 +133,16 @@ def prepare_network(ii, bad_data, gradSpike, TSpike, data, gradient, bathy_depth
 	# fraction of points below to all points
 	fraction = below/float(above+below)
 	
-	# number of standard deviations outside of the mean (takes in negative values)
-	gradDiff = grad/float(stdDev)
-	dev = 0
-	if (gradDiff > 0):
-		dev = math.ceil(gradDiff)
-	else:
-		dev = math.floor(gradDiff)
+	try:
+		# number of standard deviations outside of the mean (takes in negative values)
+		gradDiff = grad/float(stdDev)
+		dev = 0
+		if (gradDiff > 0):
+			dev = math.ceil(gradDiff)
+		else:
+			dev = math.floor(gradDiff)
+	except:
+		dev = 0
 	
 	return([HBpoint, dev, fraction, zdiff])
 		
@@ -244,7 +252,7 @@ def partition (alist,first,last):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("HBfiles_golden.txt","r")
+namefile = open("crossvalidation.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -275,14 +283,14 @@ OUTPUTS:
 n = len(name_array)
 
 # writing to file
-f = open('nn_training_data.txt','w')
+f = open('nn_crossvalidation_data.txt','w')
 f.write('expected_output,HBpoint,dev,fraction,zdiff\n')
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
 
 # creating the weights and architecture for the neural network
-net = neuralNet([4,5,1])
+net = nn.neuralNet([4,5,1])
 
 for i in range(0,n):
 	filename = name_array[i]
@@ -296,25 +304,29 @@ for i in range(0,n):
 	inc = hb.temp_increase(data, 50)
 	extra_bad_data = hb.concat(const, inc, gradSpike, TSpike)
 
-	# sorting and removing all of the repeats in bad data
-	bad_data = sortPls(extra_bad_data)
-	
-	# looping through each data point
-	m = len(bad_data[:,0])
-	for j in range(0,m):
-		bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		
-		# these are the neural network inputs and outputs
-		nnInput = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth)
-		nnInput = feature_scaling(nnInput)
-		nnOutput = nn_out(bad_data, hb_depth, j)
-		if (nnOutput == 1):		
-			print(nnOutput, nnInput)
-		
-		# writing parameters to file
-		f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+',' \
-				+str(nnInput[2])+','+str(nnInput[3])+'\n')	
+	if (type(extra_bad_data) == type(np.array([0,0,0]))) & (len(extra_bad_data) != 0):
 
+		# sorting and removing all of the repeats in bad data
+		bad_data = sortPls(extra_bad_data)
+	
+		# looping through each data point
+		m = len(bad_data[:,0])
+		for j in range(0,m):
+			bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
+		
+			# these are the neural network inputs and outputs
+			nnInput = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth)
+			nnInput = nn.feature_scaling(nnInput)
+			nnOutput = nn_out(bad_data, hb_depth, j)
+			if (nnOutput == 1):		
+				print(nnOutput, nnInput)
+		
+			# writing parameters to file
+			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+',' \
+					+str(nnInput[2])+','+str(nnInput[3])+'\n')	
+
+	else:
+		continue
 
 	print("\n")
 

@@ -39,7 +39,6 @@ def sigmoid_prime(z):
     return sigmoid(z)*(1-sigmoid(z))
 
 class neuralNet:
-
 	'''
 	Used to initialise the neural network (with one hidden layer). Note that you should include the
 	bais terms in the dimesions input. Variables:
@@ -52,16 +51,25 @@ class neuralNet:
 		self.numLayers = len(size)
 		self.size = size
 		self.weights = [np.random.randn(size[1], size[0]+1), np.random.randn(size[2],size[1]+1)]
-		self.weightgrads = [np.zeros((size[1], size[0]+1), dtype=float), \
-							np.zeros((size[2],size[1]+1), dtype=float)]
-	
-	# forward propogation to return the outputs of the neural network
-	# data to be inputted as a list of the features you want to train the network on
-	def forwardprop(self, data):
-	
+		self.weightgrads = [np.zeros((size[1], size[0]+1), dtype=float), np.zeros((size[2],size[1]+1), dtype=float)]
+
+	# ------------------------------------------------------------------------
+	# ------------------------------------------------------------------------
+	# ------------------------------------------------------------------------
+
+	'''
+	Re-writing the code above to have one that calculate the cost function and another the other that computes the gradient of the weights
+	These should take X, y and theta as the only inputs
+
+	Regularisation is still to be included in the code below
+	'''
+
+	# used for backprop algorithm and cost function
+	def forwardProp(self,X,y,lambd):
+
 		# input layer (and adding bias)
 		a1 = [1]
-		a1.extend(data)
+		a1.extend(X)
 		a1 = np.array(a1)
 	
 		# hidden layer (and adding bias)
@@ -76,18 +84,21 @@ class neuralNet:
 		z3 = np.dot(self.weights[1],a2)
 		a3 = sigmoid(z3)
 		
-		return(a3, z2, a1)
+		return([a1, z2, a2, z3, a3])
 
-	# backpropagation method for finding the gradients of the weights
-	def backprop(self, output, expect, z2, a1):
+	
+	# back propogation code
+	def backProp(self,X,y,lambd):
 
 		'''
-		Need to use a gradient checking code to see that the gradients that are being calculated
-		are close to what we expect them to be
+		Need to use a gradient checking code to see that the gradients that are being calculated are close to what we expect them to be
 		'''
+
+		# running forward propogation to get parameter values
+		[a1, z2, a2, z3, a3] = self.forwardProp(X,y,lambd)
 
 		# output layer
-		delta3 = output - expect
+		delta3 = a3 - y
 	
 		# hidden layer
 		theta2 = np.transpose(self.weights[1])
@@ -102,32 +113,23 @@ class neuralNet:
 		# derivatives ignoring regularisation for the second set of weights
 		delta3 = np.asmatrix(delta3)
 		a2 = np.asmatrix(sigmoid(z2))
-		self.weightgrads[1] += np.dot(np.transpose(delta3),a2)		
+		self.weightgrads[1] += np.dot(np.transpose(delta3),a2)
 
-	# calculation of the cost function with those gradient values (unregularised)
-	def costFunc(self, data, expect):
+		return(self.weightgrads)
 
-		# computing the output from the weights
-		a1 = [1]
-		a1.extend(data)
-		a1 = np.array(a1)
-		z2 = np.dot(self.weights[0], a1)		
-		a2 = [1]
-		a2.extend(list(z2))
-		z2 = np.array(a2)
-		a2 = np.array(a2)
-		a2 = sigmoid(a2)
-		z3 = np.dot(self.weights[1],a2)
-		output = sigmoid(z3) # this is also a3 or h(theta) 
+	
+	# computing the cost function
+	def costFunc(self,X,y,lambd):
 
-		# m should be the length of both the output and input
-		m = len(output)
-		
-		# computing the cost
-		J = -(1/float(m))*(expect*np.log(output)+(1-expect)*np.log(1-output))
-		
+		# running forward propogation to get parameter values
+		[a1, z2, a2, z3, a3] = self.forwardProp(X,y,lambd)
+
+		# computing the cost from these
+		m = len(a3)
+		J = -(1/float(m))*(y*np.log(a3)+(1-y)*np.log(1-a3))
+
 		return(J)
-
+	
 
 ######################################################################################################
 # reading in neural network input parameters
@@ -150,9 +152,16 @@ with open('nn_training_data.txt') as f:
 features = np.array(features)
 y = np.array(y)
 
-for i in range(0,len(features)):
-	print(y[i], features[i])
+# creating neural network architecture
+net = neuralNet([4,5,1])
+lambd = 0
 
+for i in range(0,len(features)):
+	#print(net.backProp(features[i],y[i],lambd))
+	#print(net.costFunc(features[i],y[i],lambd))
+	#theta = op.fmin_cg(net.costFunc, fprime=net.backProp, x0=net.weights, args=(features[i],y[i],lambd), maxiter=50)
+	#print(theta)
+	#res = op.minimize(fun=net.costFunc, x0=net.weights, args=(features[i],y[i],lambd), method='TNC')
 
 
 

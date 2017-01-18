@@ -252,7 +252,7 @@ def partition (alist,first,last):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("crossvalidation.txt","r")
+namefile = open("training.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -276,21 +276,18 @@ INPUTS:
  
 OUTPUTS:
  - probability of singular point being a hit bottom location
-
+ - true or false
 """
 
 # checking code
 n = len(name_array)
 
 # writing to file
-f = open('nn_crossvalidation_data.txt','w')
+f = open('nn_complete_training.txt','w')
 f.write('expected_output,HBpoint,dev,fraction,zdiff\n')
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
-
-# creating the weights and architecture for the neural network
-net = nn.neuralNet([4,5,1])
 
 for i in range(0,n):
 	filename = name_array[i]

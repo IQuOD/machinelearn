@@ -153,27 +153,42 @@ y: expected output based on the
 '''
 
 features = []
+hb = []
 y = []
 
 with open('nn_training_data.txt') as f:
 	next(f)
 	for line in f:
 		line = line.split(',')
-		y.append(int(line[0]))
+		hb.append(int(line[0]))
 		features.append([int(line[1]),float(line[2]),float(line[3]),float(line[4].replace('\n',''))])
 	
 features = np.array(features)
+
+# creating the output by returning an array structured as such: 
+# y = [true hit bottom point, not hit bottom point]
+tr = [1, 0]
+fls = [0, 1]
+
+for i in range(0,len(hb)):
+	if (hb[i] == 1):
+		y.append(tr)
+	else:
+		y.append(fls)
+
 y = np.array(y)
 
 # creating neural network architecture
-net = neuralNet([4,5,1])
+net = neuralNet([4,5,2])
 lambd = 0
 
 for i in range(0,len(features)):
-	
+	net.forwardProp(features[i],y[i],lambd)
+	net.backProp(features[i],y[i],lambd)
+	print(net.costFunc(features[i],y[i],lambd))
 	'''
 	Here I have implemented a neural net using gradient descent (not the most effective
-	algorithm)
+	algorithm - need to change the data to have an equal number of good and bad points)
 
 	net.backProp(features[i],y[i],lambd)
 	print("Cost: "+str(net.costFunc(features[i],y[i],lambd)))

@@ -11,53 +11,241 @@ from __future__ import division, print_function, absolute_import
 import os.path
 import numpy as np
 import tflearn
+import random
+
+
+######################################################################################################
+# functions to help prepare the data
+
+# code to reduce the poor data
+def reduce_data(X,y):
+	'''
+	Code to take the various poor data points and removing some so that the data that is fed into
+	the network is an even number of good and bad points
+	'''
+	# counting the number of times there are hits
+	m = len(y)
+	good_count_indices = []
+	good_count = 0
+	
+	# going through the imported data to find the "good" points
+	for i in range(0,m):
+		if (y[i] == [1,0]):
+			good_count += 1
+			good_count_indices.append(i)
+		else:
+			continue
+
+	# writing new lists that store the "filtered" data points
+	X_filt = []
+	y_filt = []
+	n = len(good_count_indices)
+	for i in range(0,n-1):
+	
+		# finding two indices to add (adding two bad data points)
+		rand1 = random.random()
+		rand2 = random.random()
+		rand3 = random.random()
+		if (i == 0):
+			top = 0
+			floor = good_count_indices[i]
+		else:
+			top = good_count_indices[i]
+			floor = good_count_indices[i+1]
+		diff = floor-top
+		ind1 = int(floor-diff*rand1)
+		ind2 = int(floor-diff*rand2)
+		ind3 = int(floor-diff*rand3)
+
+		# making sure there are no repeats in the good data
+		if (ind1 == good_count_indices[i]):
+			if (random.random() > 0.5):
+				ind1 = ind1 + 1
+			else:
+				ind1 = ind1 - 1
+
+		if (ind2 == good_count_indices[i]):
+			if (random.random() > 0.5):
+				ind2 = ind2 + 1
+			else:
+				ind2 = ind2 - 1
+
+		if (ind3 == good_count_indices[i]):
+			if (random.random() > 0.5):
+				ind3 = ind3 + 1
+			else:
+				ind3 = ind3 - 1
+		
+		# adding to new array
+		X_filt.append(X[good_count_indices[i]])
+		X_filt.append(X[ind1])
+		X_filt.append(X[ind2])
+		X_filt.append(X[ind3])
+		y_filt.append(y[good_count_indices[i]])
+		y_filt.append(y[ind1])
+		y_filt.append(y[ind2])
+		y_filt.append(y[ind3])
+		
+	print("Data reduction (removing bad data)")
+	print("before:",len(X))
+	print("after:",len(X_filt))
+	return(X_filt,y_filt)
+
+
+# getting statistics for the network (F-Score)
+def statistics(predictions, Xtest, ytest, vb):
+	'''
+	Uses metrics precision and recall, but can also give the true/false detection rates for
+	hit bottoms and non-hit bottom points. Note that all three of the inputs should have the
+	same length
+
+	The function returns the F score but will also print the other statistics used to measure
+	the success of a learning algorithm
+
+	vb is 1 if you want to print or 0 if you don't want to print stats to screen (will always 
+	print the F score)
+	'''
+	print('\n')
+	print("Generating statistics...")
+	m = len(predictions)
+
+	# true positive detection rate
+	trueHB = 0
+	detectHB = 0
+	for i in range(0,m):
+		# checking if the result is truly a "good" HB point
+		if (ytest[i] == 1):
+			trueHB += 1
+			# counting the number of points identified out of these
+			if (predictions[i][0] > predictions[i][1]):
+				detectHB += 1
+			else:
+				continue
+		else:
+			continue
+	true_pos = float(detectHB)/float(trueHB)
+	if (vb == 1):
+		print("True positive detection rate: "+str(true_pos))
+
+	# true negative detection rate
+	trueNeg = 0
+	detectNeg = 0
+	for i in range(0,m):
+		# checking all points that are not hit bottoms
+		if (ytest[i] == 0):
+			trueNeg += 1
+			# counting the number of these points that are identified as not HB points
+			if (predictions[i][1] > predictions[i][0]):
+				detectNeg += 1
+			else:
+				continue
+		else:
+			continue
+	true_neg = float(detectNeg)/float(trueNeg)
+	if (vb == 1):
+		print("True negative detection rate: "+str(true_neg))
+
+	# false positive rate
+	falsePos = 0
+	detectFalseNotHB = 0 
+	for i in range(0,m):
+		# checking all points that are not HB points
+		if (ytest[i] == 0):
+			falsePos += 1
+			# taking fraction that are actually detected as HB
+			if (predictions[i][0] > predictions[i][1]):
+				detectFalseNotHB += 1
+			else:
+				continue
+		else:
+			continue
+	false_pos = float(detectFalseNotHB)/float(falsePos)
+	if (vb == 1):
+		print("False positive detection rate: "+str(false_pos))
+
+	# false negative rate
+	falseNeg = 0
+	detectFalseHB = 0
+	for i in range(0,m):
+		# checking all of the points that are HB
+		if (ytest[i] == 1):
+			falseNeg += 1
+			# taking fraction of these that are not detected as HB
+			if (predictions[i][1] > predictions[i][0]):
+				detectFalseHB += 1
+			else:
+				continue
+		else:
+			continue
+	false_neg = float(detectFalseHB)/float(falseNeg)
+	if (vb == 1):
+		print("False negative detection rate: "+str(false_neg))
+
+	# pulling out other statistics: precision, recall and F-Score
+	precision = float(detectHB)/float(detectHB+detectFalseNotHB)
+	recall = float(detectHB)/float(detectFalseHB+detectHB)
+	Fscore = float(2*precision*recall)/float(precision+recall)
+
+	# printing to screen the results of this statistics call
+	if (vb == 1):
+		print("Precison: "+str(precision))
+		print("Recall: "+str(recall))
+	print("F-score: "+str(Fscore))	
+	print("\n")
+
+	return(Fscore)
 
 
 ######################################################################################################
 # setting up data for feeding into neural network
 
-# importing the training set data
-dat1 = []
-with open("nn_training_data.txt") as f:
-	next(f)
-	for line in f:
-	    dat1.append([float(x.strip()) for x in line.split(",")])
+# checking to see if model already exists
+if (os.path.isfile('xbt_nn1.tfl.index') == True):
+	model.load('xbt_nn1.tfl')
 
-tr = [1, 0]
-fls = [0, 1]
-y_train = []
-X_train = []
-n1 = len(dat1)
-for i in range(0,n1):
-	X_train.append([dat1[i][1],dat1[i][2],dat1[i][3],dat1[i][4]])	
-	if (dat1[i][0] == 1):
-		y_train.append(tr)
-	else:
-		y_train.append(fls)
+else:
+	# importing the training set data
+	dat1 = []
+	with open("nn_complete_training.txt") as f:
+		next(f)
+		for line in f:
+			dat1.append([float(x.strip()) for x in line.split(",")])
 
-# importing cross validation data
-dat2 = []
-with open("nn_crossvalidation_data.txt") as f:
-	next(f)
-	for line in f:
-	    dat2.append([float(x.strip()) for x in line.split(",")])
+	tr = [1, 0]
+	fls = [0, 1]
+	y_train = []
+	X_train = []
+	n1 = len(dat1)
+	for i in range(0,n1):
+		X_train.append([dat1[i][1],dat1[i][2],dat1[i][3],dat1[i][4]])	
+		if (dat1[i][0] == 1):
+			y_train.append(tr)
+		else:
+			y_train.append(fls)
 
-y_val = []
-X_val = []
-n2 = len(dat2)
-for i in range(0,n2):
-	X_val.append([dat2[i][1],dat2[i][2],dat2[i][3],dat2[i][4]])	
-	if (dat2[i][0] == 1):
-		y_val.append(tr)
-	else:
-		y_val.append(fls)
+	# importing cross validation data
+	dat2 = []
+	with open("nn_crossvalidation_data.txt") as f:
+		next(f)
+		for line in f:
+			dat2.append([float(x.strip()) for x in line.split(",")])
+
+	y_val = []
+	X_val = []
+	n2 = len(dat2)
+	for i in range(0,n2):
+		X_val.append([dat2[i][1],dat2[i][2],dat2[i][3],dat2[i][4]])	
+		if (dat2[i][0] == 1):
+			y_val.append(tr)
+		else:
+			y_val.append(fls)
 
 # importing test data
 dat3 = []
 with open("nn_test_data.txt") as f:
 	next(f)
 	for line in f:
-	    dat3.append([float(x.strip()) for x in line.split(",")])
+		dat3.append([float(x.strip()) for x in line.split(",")])
 
 X_test = []
 y_test = []
@@ -65,6 +253,11 @@ n3 = len(dat3)
 for i in range(0,n3):
 	X_test.append([dat3[i][1],dat3[i][2],dat3[i][3],dat3[i][4]])
 	y_test.append(dat3[i][0])
+
+# filtering through the data to remove majority of poor points
+[X_new, y_new] = reduce_data(X_train,y_train)
+X_train = X_new
+y_train = y_new
 
 # printing out dimensions of the training data
 print("\n")
@@ -74,40 +267,30 @@ print("Outputs:",len(y_train),len(y_train[0]))
 print("\n")
 
 ######################################################################################################
-# running neural network with tflearn
+# running neural network with tflearnS
 
-# testing the tflearn reading data function
-net = tflearn.input_data(shape=[None,4])
-net = tflearn.fully_connected(net, 5, activation='sigmoid')
-net = tflearn.fully_connected(net, 2, activation='sigmoid')
-net = tflearn.regression(net)
+# checking to see if model already exists
+if (os.path.isfile('xbt_nn1.tfl.index') == True):
+	pass
 
-# creating the model
-model = tflearn.DNN(net)
-model.fit(X_train,y_train, n_epoch=20, validation_set = (X_val, y_val), \
-			show_metric=True, run_id="XBT hit bottom data")
+else:
+	# testing the tflearn reading data function
+	net = tflearn.input_data(shape=[None,4])
+	net = tflearn.fully_connected(net, 5, activation='sigmoid')
+	net = tflearn.fully_connected(net, 10)
+	net = tflearn.fully_connected(net, 2, activation='sigmoid')
+	net = tflearn.regression(net)
 
-# using model to predict
+	# creating the model
+	model = tflearn.DNN(net)
+	model.fit(X_train,y_train, n_epoch=20, validation_set = (X_val, y_val), \
+				show_metric=True, run_id="XBT hit bottom data")
+
+# using model to make predictions on test set
 pred = model.predict(X_test)
-m = len(pred)
-count = 0
-total = 0
 
-# collecting basic statistics
-for i in range(0,m):
-	
-	# counting the number of hit bottom points
-	if (y_test[i] == 1):
-		total += 1
-
-	# counting the number detected from code
-	if (pred[i][0] > pred[i][1]):
-		print(pred[i])
-		count += 1
-	else:
-		continue
-
-print("True detection rate:", float(count)/float(total))
+# collecting key statistics on the data
+statistics(pred, X_test, y_test, 1)
 
 
 ######################################################################################################

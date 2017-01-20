@@ -44,6 +44,7 @@ import hitbottom as hb
 import scipy.optimize as op
 import neuralnet as nn
 import math
+import random
 import os.path
 import matplotlib.pyplot as plt
 from netCDF4.utils import ncinfo
@@ -243,6 +244,68 @@ def partition (alist,first,last):
 	alist[first] = alist[rightmark]
 	alist[rightmark] = temp
 	return rightmark
+
+
+# code to reduce the poor data
+def reduce_data(X,y):
+	'''
+	Code to take the various poor data points and removing some so that the data that is fed into
+	the network is an even number of good and bad points
+	'''
+	# counting the number of times there are hits
+	m = len(y)
+	good_count_indices = []
+	good_count = 0
+	
+	# going through the imported data to find the "good" points
+	for i in range(0,m):
+		if (y==1):
+			good_count += 1
+			good_count_indices.append(i)
+		else:
+			continue
+
+	# writing new lists that store the "filtered" data points
+	X_filt = []
+	y_filt = []
+	n = len(good_count_indices)
+	for i in range(0,n):
+	
+		# finding two indices to add (adding two bad data points)
+		rand1 = random.random()
+		rand2 = random.random()
+		if (i == 0):
+			top = 0
+			floor = good_count_indices[i]
+		else:
+			top = good_count_indices[i]
+			floor = good_count_indices[i+1]
+		diff = floor-top
+		ind1 = int(floor-diff*rand1)
+		ind2 = int(floor-diff*rand2)
+
+		# making sure there are no repeats in the good data
+		if (int1 == good_count_indices[i]):
+			if (random.random() > 0.5):
+				int1 = int1 + 1
+			else:
+				int1 = int1 - 1
+
+		if (int2 == good_count_indices[i]):
+			if (random.random() > 0.5):
+				int2 = int2 + 1
+			else:
+				int2 = int2 - 1
+		
+		# adding to new array
+		X_filt.append(X[good_count_indices[i]])
+		X_filt.append(X[int1])
+		X_filt.append(X[int2])
+		y_filt.append(y[good_count_indices[i]])
+		y_filt.append(y[int1])
+		y_filt.append(y[int2])
+		
+	return(X_filt,y_filt)
 
 
 ######################################################################################################

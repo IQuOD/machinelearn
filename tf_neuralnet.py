@@ -215,9 +215,11 @@ else:
 	fls = [0, 1]
 	y_train = []
 	X_train = []
+	filename_train = []
 	n1 = len(dat1)
 	for i in range(0,n1):
 		X_train.append([dat1[i][1],dat1[i][2],dat1[i][3],dat1[i][4]])	
+		filename_train.append(dat1[i][5])
 		if (dat1[i][0] == 1):
 			y_train.append(tr)
 		else:
@@ -232,9 +234,11 @@ else:
 
 	y_val = []
 	X_val = []
+	filename_crossval = []
 	n2 = len(dat2)
 	for i in range(0,n2):
 		X_val.append([dat2[i][1],dat2[i][2],dat2[i][3],dat2[i][4]])	
+		filename_crossval.append(dat2[i][2])
 		if (dat2[i][0] == 1):
 			y_val.append(tr)
 		else:
@@ -247,10 +251,12 @@ with open("nn_test_data.txt") as f:
 	for line in f:
 		dat3.append([float(x.strip()) for x in line.split(",")])
 
+filename_test = []
 X_test = []
 y_test = []
 n3 = len(dat3)
 for i in range(0,n3):
+	filename_test.append(dat3[i][5])
 	X_test.append([dat3[i][1],dat3[i][2],dat3[i][3],dat3[i][4]])
 	y_test.append(dat3[i][0])
 
@@ -291,6 +297,8 @@ pred = model.predict(X_test)
 
 # collecting key statistics on the data
 statistics(pred, X_test, y_test, 1)
+
+
 
 
 ######################################################################################################

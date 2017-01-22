@@ -42,10 +42,10 @@ import numpy as np
 import pandas as pd
 import hitbottom as hb
 import scipy.optimize as op
-import neuralnet as nn
 import math
 import random
 import os.path
+import neuralnet as nn
 import matplotlib.pyplot as plt
 from netCDF4.utils import ncinfo
 from netCDF4 import Dataset
@@ -317,8 +317,10 @@ path = "../HBfiles/"
 # taking sample of files from the name file
 namefile = open("training.txt","r")
 name_array = []
+file_names = []
 for line in namefile:
 	line = line.rstrip()
+	file_names.append(line)
 	name = str(path+line)
 	name_array.append(name)
 namefile.close()
@@ -347,13 +349,14 @@ n = len(name_array)
 
 # writing to file
 f = open('nn_complete_training.txt','w')
-f.write('expected_output,HBpoint,dev,fraction,zdiff\n')
+f.write('expected_output,HBpoint,dev,fraction,zdiff,filename\n')
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
 
 for i in range(0,n):
 	filename = name_array[i]
+	raw_name = file_names[i]
 	print("Iterating through file "+str(i)+" ("+str(filename)+"):")
 	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
 	
@@ -379,11 +382,11 @@ for i in range(0,n):
 			nnInput = nn.feature_scaling(nnInput)
 			nnOutput = nn_out(bad_data, hb_depth, j)
 			if (nnOutput == 1):		
-				print(nnOutput, nnInput)
+				print(nnOutput, nnInput, raw_name)
 		
 			# writing parameters to file
 			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+',' \
-					+str(nnInput[2])+','+str(nnInput[3])+'\n')	
+					+str(nnInput[2])+','+str(nnInput[3])+','+str(raw_name)+'\n')	
 
 	else:
 		continue

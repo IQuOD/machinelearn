@@ -42,6 +42,7 @@ import numpy as np
 import pandas as pd
 import math
 import os.path
+import sys, getopt
 import matplotlib.pyplot as plt
 from netCDF4.utils import ncinfo
 from netCDF4 import Dataset
@@ -56,7 +57,7 @@ path = "../HBfiles/"
 
 # taking sample of files from the name file
 #namefile = open("HBfiles_golden.txt","r")
-namefile = open("HBfiles_golden.txt","r")
+namefile = open("nn_incorrect_classification.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()

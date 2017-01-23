@@ -105,54 +105,53 @@ def read_data(filename):
 	return(data, gradient, flags, hb_depth, latitude, longitude, date)
 
 # defining a function for plotting the data
-"""
-Input to the plot function is either True or False, where True will show the plots
-and False will not show the plots
-"""
 def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filename):
-	
-	# conditional subplot of temperature and gradient
+	"""
+	Input of the function for "plot" takes into account whether or not you want to plot 
+	the points potential hit bottom and bad points
+	"""
+
+	# plotting temperature
+	plt.figure(figsize=(11.5,9))
+	plt.subplot(1,2,1)
+	plt.plot(data[:,1],data[:,0])
+
+	# plotting "bad data" if true
 	if (plot == True):
-		# plotting temperature
-		plt.figure(figsize=(11.5,9))
-		plt.subplot(1,2,1)
-		plt.plot(data[:,1],data[:,0])
-	
-		# plotting "bad data" 
 		plt.plot(error_pts[:,1],error_pts[:,0],'bo')	
 
-		# plotting the points of potential HB event
+	# plotting the points of potential HB event if true
+	if (plot == True):
 		plt.plot(pot_hb[:,1],pot_hb[:,0],'ro')
 
-		plt.ylabel("Depth [m]")
-		plt.xlabel("Temperature [degrees C]")
-		plt.gca().invert_yaxis()
-		plt.title("T")
-		plt.axhline(y=bathydepth, hold=None, color='g')	
-		for i in range(0,len(flags.flag)):
-			if (flags.flag[i] == "HB"):
-				ref = flags.depth[i]
-				plt.axhline(y=ref, hold=None, color='r')
-			else:
- 				continue
-		# plotting temperature gradient
-		plt.subplot(1,2,2)
-		plt.plot(gradient[:,1], gradient[:,0])
-		plt.ylabel("Depth [m]")
-		plt.xlabel("Temperature Gradient [degrees C/m]")
-		plt.gca().invert_yaxis()
-		plt.title("dTdz")	
-		plt.axhline(y=bathydepth, hold=None, color='g')	
-		for i in range(0,len(flags.flag)):
-			if (flags.flag[i] == "HB"):
-				ref = flags.depth[i]
-				plt.axhline(y=ref, hold=None, color='r')
-			else:
- 				continue
-		plt.suptitle("Temperature data for "+str(filename))
-		plt.show()
-	else:
-		pass
+	plt.ylabel("Depth [m]")
+	plt.xlabel("Temperature [degrees C]")
+	plt.gca().invert_yaxis()
+	plt.title("T")
+	plt.axhline(y=bathydepth, hold=None, color='g')	
+	for i in range(0,len(flags.flag)):
+		if (flags.flag[i] == "HB"):
+			ref = flags.depth[i]
+			plt.axhline(y=ref, hold=None, color='r')
+		else:
+			continue
+	# plotting temperature gradient
+	plt.subplot(1,2,2)
+	plt.plot(gradient[:,1], gradient[:,0])
+	plt.ylabel("Depth [m]")
+	plt.xlabel("Temperature Gradient [degrees C/m]")
+	plt.gca().invert_yaxis()
+	plt.title("dTdz")	
+	plt.axhline(y=bathydepth, hold=None, color='g')	
+	for i in range(0,len(flags.flag)):
+		if (flags.flag[i] == "HB"):
+			ref = flags.depth[i]
+			plt.axhline(y=ref, hold=None, color='r')
+		else:
+			continue
+	plt.suptitle("Temperature data for "+str(filename))
+	plt.show()
+
 	
 # importing bathymetry data and using it as a test
 def bathymetry(filename):

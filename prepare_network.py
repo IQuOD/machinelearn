@@ -315,7 +315,7 @@ def reduce_data(X,y):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("training.txt","r")
+namefile = open("HBfiles_golden.txt","r")
 name_array = []
 file_names = []
 for line in namefile:
@@ -348,7 +348,7 @@ OUTPUTS:
 n = len(name_array)
 
 # writing to file
-f = open('nn_complete_training.txt','w')
+f = open('nn_golden_training.txt','w')
 f.write('expected_output,HBpoint,dev,fraction,zdiff,filename\n')
 
 # calling bathymetry data

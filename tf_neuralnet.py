@@ -102,12 +102,16 @@ def statistics(predictions, Xtest, ytest, vb):
 	The function returns the F score but will also print the other statistics used to measure
 	the success of a learning algorithm
 
+	The good (points that have been identified correctly) have a value of 1 in the array identIndex
+	and the points that were not identified correctly will have a zero value
+
 	vb is 1 if you want to print or 0 if you don't want to print stats to screen (will always 
 	print the F score)
 	'''
 	print('\n')
 	print("Generating statistics...")
 	m = len(predictions)
+	identIndex = np.zeros(m)
 
 	# true positive detection rate
 	trueHB = 0
@@ -119,6 +123,7 @@ def statistics(predictions, Xtest, ytest, vb):
 			# counting the number of points identified out of these
 			if (predictions[i][0] > predictions[i][1]):
 				detectHB += 1
+				identIndex[i] = 1
 			else:
 				continue
 		else:
@@ -137,6 +142,7 @@ def statistics(predictions, Xtest, ytest, vb):
 			# counting the number of these points that are identified as not HB points
 			if (predictions[i][1] > predictions[i][0]):
 				detectNeg += 1
+				identIndex[i] = 1
 			else:
 				continue
 		else:
@@ -193,8 +199,51 @@ def statistics(predictions, Xtest, ytest, vb):
 	print("F-score: "+str(Fscore))	
 	print("\n")
 
-	return(Fscore)
+	return(Fscore, identIndex)
 
+
+# function to print the remaining 
+def files_remaining(namefile_test, identIndex):
+	'''
+	This function takes the results of the neural network and writes a new file which has the
+	filenames of the profiles that were not correctly identified (false positive or negative profiles)
+	This is used so that these can be plotted for re-examination
+	'''
+	print("Writing file of incorrectly identified profile names...")
+	n = len(namefile_test)
+	filename_array = []
+	f = open('nn_incorrect_classification.txt','w+')
+
+	# looping through each example
+	for i in range(0,n):
+		name = namefile_test[i]
+		count = 0
+
+		# checking that there are no repeats
+		if (len(filename_array) != 0):
+			for j in range(0,len(filename_array)):
+				if (filename_array[j] == name):
+					count += 1
+				else:
+					continue
+			# adding to the file only if there are no repeats
+			if (count == 0):
+				if (identIndex[i] == 0):
+					f.write(name+"\n")
+					filename_array.append(name)
+				else:
+					continue
+			else:
+				continue
+
+		# for the first point
+		else:
+			if (identIndex[i] == 0):
+				f.write(name+"\n")
+				filename_array.append(name)
+			else:
+				continue
+	
 
 ######################################################################################################
 # setting up data for feeding into neural network
@@ -209,7 +258,7 @@ else:
 	with open("nn_complete_training.txt") as f:
 		next(f)
 		for line in f:
-			dat1.append([float(x.strip()) for x in line.split(",")])
+			dat1.append([x.strip() for x in line.split(",")])
 
 	tr = [1, 0]
 	fls = [0, 1]
@@ -218,9 +267,9 @@ else:
 	filename_train = []
 	n1 = len(dat1)
 	for i in range(0,n1):
-		X_train.append([dat1[i][1],dat1[i][2],dat1[i][3],dat1[i][4]])	
+		X_train.append([float(dat1[i][1]),float(dat1[i][2]),float(dat1[i][3]),float(dat1[i][4])])	
 		filename_train.append(dat1[i][5])
-		if (dat1[i][0] == 1):
+		if (int(dat1[i][0]) == 1):
 			y_train.append(tr)
 		else:
 			y_train.append(fls)
@@ -230,16 +279,16 @@ else:
 	with open("nn_crossvalidation_data.txt") as f:
 		next(f)
 		for line in f:
-			dat2.append([float(x.strip()) for x in line.split(",")])
+			dat2.append([x.strip() for x in line.split(",")])
 
 	y_val = []
 	X_val = []
 	filename_crossval = []
 	n2 = len(dat2)
 	for i in range(0,n2):
-		X_val.append([dat2[i][1],dat2[i][2],dat2[i][3],dat2[i][4]])	
+		X_val.append([float(dat2[i][1]),float(dat2[i][2]),float(dat2[i][3]),float(dat2[i][4])])	
 		filename_crossval.append(dat2[i][2])
-		if (dat2[i][0] == 1):
+		if (int(dat2[i][0]) == 1):
 			y_val.append(tr)
 		else:
 			y_val.append(fls)
@@ -249,7 +298,7 @@ dat3 = []
 with open("nn_test_data.txt") as f:
 	next(f)
 	for line in f:
-		dat3.append([float(x.strip()) for x in line.split(",")])
+		dat3.append([x.strip() for x in line.split(",")])
 
 filename_test = []
 X_test = []
@@ -257,8 +306,8 @@ y_test = []
 n3 = len(dat3)
 for i in range(0,n3):
 	filename_test.append(dat3[i][5])
-	X_test.append([dat3[i][1],dat3[i][2],dat3[i][3],dat3[i][4]])
-	y_test.append(dat3[i][0])
+	X_test.append([float(dat3[i][1]),float(dat3[i][2]),float(dat3[i][3]),float(dat3[i][4])])
+	y_test.append(int(dat3[i][0]))
 
 # filtering through the data to remove majority of poor points
 [X_new, y_new] = reduce_data(X_train,y_train)
@@ -296,9 +345,10 @@ else:
 pred = model.predict(X_test)
 
 # collecting key statistics on the data
-statistics(pred, X_test, y_test, 1)
-
-
+[Fscore, identIndex] = statistics(pred, X_test, y_test, 1)
+	
+# function to remove the test data correctly identified by the neural network
+files_remaining(filename_test, identIndex)
 
 
 ######################################################################################################

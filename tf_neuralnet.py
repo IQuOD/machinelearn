@@ -313,6 +313,9 @@ for i in range(0,n3):
 [X_new, y_new] = reduce_data(X_train,y_train)
 X_train = X_new
 y_train = y_new
+[X_new, y_new] = reduce_data(X_val,y_val)
+X_val = X_new
+y_val = y_new
 
 # printing out dimensions of the training data
 print("\n")
@@ -346,7 +349,7 @@ pred = model.predict(X_test)
 
 # collecting key statistics on the data
 [Fscore, identIndex] = statistics(pred, X_test, y_test, 1)
-	
+
 # function to remove the test data correctly identified by the neural network
 files_remaining(filename_test, identIndex)
 

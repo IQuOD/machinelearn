@@ -315,7 +315,7 @@ def reduce_data(X,y):
 path = "../HBfiles/"
 
 # taking sample of files from the name file
-namefile = open("HBfiles_golden.txt","r")
+namefile = open("testset.txt","r")
 name_array = []
 file_names = []
 for line in namefile:
@@ -330,6 +330,9 @@ namefile.close()
 # writing code to prepare the neural network inputs
 
 """
+This is the code to prepare the first chain of the decision tree (first neural network that the
+data will be fed through). 
+
 INPUTS:
  - 1 or 0 depending on if it is or isn't a hit bottom point [int]
  - depth (bathymetry) [float]
@@ -348,8 +351,8 @@ OUTPUTS:
 n = len(name_array)
 
 # writing to file
-f = open('nn_golden_training.txt','w')
-f.write('expected_output,HBpoint,dev,fraction,zdiff,filename\n')
+f = open('nn_test_data.txt','w')
+f.write('expected_output,HBpoint,dev,fraction,zdiff,filename,depth,temp\n')
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
@@ -385,8 +388,9 @@ for i in range(0,n):
 				print(nnOutput, nnInput, raw_name)
 		
 			# writing parameters to file
-			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+',' \
-					+str(nnInput[2])+','+str(nnInput[3])+','+str(raw_name)+'\n')	
+			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+','
+					+str(nnInput[2])+','+str(nnInput[3])+','+str(raw_name)	
+					+','+str(bad_data[j][0])+','+str(bad_data[j][1])+'\n')	
 
 	else:
 		continue

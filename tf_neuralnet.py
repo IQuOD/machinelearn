@@ -9,9 +9,13 @@ profiles. Will also be used to compare output from the hand written neural netwo
 
 from __future__ import division, print_function, absolute_import
 import os.path
+import matplotlib.pyplot as plt
+from netCDF4.utils import ncinfo
+from netCDF4 import Dataset
 import numpy as np
 import tflearn
 import random
+import hitbottom as hb
 
 
 ######################################################################################################
@@ -203,47 +207,160 @@ def statistics(predictions, Xtest, ytest, vb):
 
 
 # function to print the remaining 
-def files_remaining(namefile_test, identIndex):
+def files_remaining(filename_test, y_test, pred):
 	'''
 	This function takes the results of the neural network and writes a new file which has the
 	filenames of the profiles that were not correctly identified (false positive or negative profiles)
 	This is used so that these can be plotted for re-examination
 	'''
 	print("Writing file of incorrectly identified profile names...")
-	n = len(namefile_test)
-	filename_array = []
+	n = len(filename_test)
+	files = []
 	f = open('nn_incorrect_classification.txt','w+')
-
-	# looping through each example
-	for i in range(0,n):
-		name = namefile_test[i]
-		count = 0
-
-		# checking that there are no repeats
-		if (len(filename_array) != 0):
-			for j in range(0,len(filename_array)):
-				if (filename_array[j] == name):
-					count += 1
-				else:
-					continue
-			# adding to the file only if there are no repeats
-			if (count == 0):
-				if (identIndex[i] == 0):
-					f.write(name+"\n")
-					filename_array.append(name)
-				else:
-					continue
-			else:
-				continue
-
-		# for the first point
-		else:
-			if (identIndex[i] == 0):
-				f.write(name+"\n")
-				filename_array.append(name)
-			else:
-				continue
 	
+	# looping through points to select points not identified correctly
+	for i in range(0,n):
+		if (y_test[i] == 1):
+			if (pred[i][0] < pred[i][1]):
+				f.write(filename_test[i]+"\n")
+				files.append(filename_test[i])
+			else:
+				continue
+		else:
+			continue	
+
+	f.close()
+	print("Writing complete")
+	return(files)
+
+
+# function to take an array and remove the repeated elements from that array
+def remove_repeats(array):
+
+	# initialise output
+	output_array = []
+	n = len(array)
+	
+	# looping through the input array
+	for i in range(0,n):
+		count = 0
+		if (len(output_array) != 0):
+			# checking the output array to see if repeated (count = 1)
+			m = len(output_array)
+			for j in range(0,m):
+				if (array[i] == output_array[j]):
+					count = 1
+				else:
+					continue
+			# action if there is no repeat
+			if (count == 0):
+				output_array.append(array[i])
+			else:
+				continue			
+		else:
+			output_array.append(array[i])
+	
+	# returning filtered array
+	return(output_array)
+
+# function for printing and outputting the statistics
+def results(filename_test, tf):
+	'''
+	This can potentially be moved into a function evaluation of the performance with 
+	another metric - that is visual inspection of all of the test profiles to see if 
+	the machine identified hit bottom location can be determined to within some threshold.
+
+	Counting to gather statistics on the success rate of the model
+	'''
+	# initialise file name list
+	filearray = remove_repeats(filename_test)
+	n = len(filearray)
+
+	# setting up statistics for counting the success rate of the test set
+	correct = 0
+
+	print('\n')
+	print('Plotting profiles and collecting statistics')
+	# looping for printing
+	for i in range(0,n):
+		filename = filearray[i]
+		source = "../HBfiles/"+filename
+		[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(source)
+		# plotting temperature
+		if (tf == True):
+			plt.figure(figsize=(11.5,9))
+			plt.plot(data[:,1],data[:,0])
+			plt.ylabel("Depth [m]")
+			plt.xlabel("Temperature [degrees C]")
+			plt.gca().invert_yaxis()
+			plt.title("High probability HB region")
+		# plotting HB depth (as flagged by QC)
+		if (tf == True):
+			for i in range(0,len(flags.flag)):
+				if (flags.flag[i] == "HB"):
+					ref = flags.depth[i]
+					plt.axhline(y=ref, hold=None, color='r')
+				else:
+					continue
+		# plotting points that have high probability of being HB (as computed by NN)
+		m = len(pred)
+		points = []
+		for j in range(0,m):
+			if (filename == filename_test[j]):
+				points.append([pred[j][0],pred[j][1],z_test[j],T_test[j]])
+			else:
+				continue
+		# collecting high probability points and plotting
+		deeznuts = 0
+		deeznuts_prob = 0
+		plot_z = []
+		plot_T = []
+		high_z = []
+		high_T = []
+		max_T = []
+		max_z = []
+		for j in range(0,len(points)):
+
+			# finding the point in profile with greatest probability of being a hit bottom
+			if (points[j][0]>points[j][1]):
+	
+				# also worth checking for the point in the profile with the greatest difference
+				if ((points[j][0]) > deeznuts_prob):
+					deeznuts_prob = points[j][0]
+					deeznuts = j
+
+				# adding all points with greater probability to plot arrays
+				plot_z.append(points[j][2])
+				plot_T.append(points[j][3])
+
+			# adding all points with a probability of being a hit bottom greater than 75%
+			if (points[j][0] >= 0.75):
+				high_z.append(points[j][2])
+				high_T.append(points[j][3])
+
+		max_z = points[deeznuts][2]
+		max_T = points[deeznuts][3]
+		if (tf == True):
+			plt.plot(plot_T,plot_z,'go')
+			plt.plot(high_T,high_z,'bo')
+			plt.plot(max_T,max_z,'ro')
+
+		# collecting statistics
+		for i in range(0,len(flags.flag)):
+			if (flags.flag[i] == "HB"):
+				ref = flags.depth[i]
+				if (abs(max_z-ref) < 20):
+					correct += 1
+
+		# plotting if tf == True
+		if (tf == True):
+			plt.show()
+
+	# returning statistics
+	correct_rate = correct/float(n)
+	print("Correct detection rate: "+str(correct_rate))
+	return(correct_rate)
+
 
 ######################################################################################################
 # setting up data for feeding into neural network
@@ -303,11 +420,15 @@ with open("nn_test_data.txt") as f:
 filename_test = []
 X_test = []
 y_test = []
+z_test = []
+T_test = []
 n3 = len(dat3)
 for i in range(0,n3):
 	filename_test.append(dat3[i][5])
 	X_test.append([float(dat3[i][1]),float(dat3[i][2]),float(dat3[i][3]),float(dat3[i][4])])
 	y_test.append(int(dat3[i][0]))
+	z_test.append(float(dat3[i][6]))
+	T_test.append(float(dat3[i][7]))
 
 # filtering through the data to remove majority of poor points
 [X_new, y_new] = reduce_data(X_train,y_train)
@@ -335,13 +456,12 @@ else:
 	# testing the tflearn reading data function
 	net = tflearn.input_data(shape=[None,4])
 	net = tflearn.fully_connected(net, 5, activation='sigmoid')
-	net = tflearn.fully_connected(net, 10)
-	net = tflearn.fully_connected(net, 2, activation='sigmoid')
+	net = tflearn.fully_connected(net, 2, activation='softmax')
 	net = tflearn.regression(net)
 
 	# creating the model
 	model = tflearn.DNN(net)
-	model.fit(X_train,y_train, n_epoch=20, validation_set = (X_val, y_val), \
+	model.fit(X_train,y_train, n_epoch=25, validation_set = (X_val, y_val), \
 				show_metric=True, run_id="XBT hit bottom data")
 
 # using model to make predictions on test set
@@ -351,7 +471,10 @@ pred = model.predict(X_test)
 [Fscore, identIndex] = statistics(pred, X_test, y_test, 1)
 
 # function to remove the test data correctly identified by the neural network
-files_remaining(filename_test, identIndex)
+incorrect_files = files_remaining(filename_test, y_test, pred)
+
+# evaluation of the neural network
+results(filename_test, False)
 
 
 ######################################################################################################

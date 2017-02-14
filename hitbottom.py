@@ -13,6 +13,7 @@ This is a script with functions to check the the profiles for hit bottoms based 
 import numpy as np
 import pandas as pd
 import math
+import time
 import os.path
 import matplotlib.pyplot as plt
 from netCDF4.utils import ncinfo
@@ -105,7 +106,8 @@ def read_data(filename):
 	return(data, gradient, flags, hb_depth, latitude, longitude, date)
 
 # defining a function for plotting the data
-def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filename):
+def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, 
+			  filename, low_gradvar, bathlim):
 	"""
 	Input of the function for "plot" takes into account whether or not you want to plot 
 	the points potential hit bottom and bad points
@@ -124,6 +126,10 @@ def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filena
 	if (plot == True):
 		plt.plot(pot_hb[:,1],pot_hb[:,0],'ro')
 
+	# plotting points of low gradient variation
+	if (plot == True):
+		plt.plot(low_gradvar[:,1],low_gradvar[:,0],'yo')
+
 	plt.ylabel("Depth [m]")
 	plt.xlabel("Temperature [degrees C]")
 	plt.gca().invert_yaxis()
@@ -135,6 +141,7 @@ def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filena
 			plt.axhline(y=ref, hold=None, color='r')
 		else:
 			continue
+	plt.axhline(y=bathlim, hold=None, color='y')
 	# plotting temperature gradient
 	plt.subplot(1,2,2)
 	plt.plot(gradient[:,1], gradient[:,0])
@@ -149,9 +156,10 @@ def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb, filena
 			plt.axhline(y=ref, hold=None, color='r')
 		else:
 			continue
+	plt.axhline(y=bathlim, hold=None, color='y')
 	plt.suptitle("Temperature data for "+str(filename))
 	plt.show()
-
+	
 	
 # importing bathymetry data and using it as a test
 def bathymetry(filename):
@@ -386,6 +394,9 @@ def bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height):
 	Find the depth in the bathymetry data from the lat and long provided
 	Note that the longitude needs to be converted to 0-360 from -180-180
 	Fuction returns the depth
+
+	latitude and longitude refer to the values of lat and long of the profile being used
+	the bath_lon, bath_lat and bath_height data is that from the bathymetry database
 	"""
 	# lengths of the two arrays
 	n1 = len(bath_lat)
@@ -450,6 +461,252 @@ def T_spike(data, threshold):
 	
 	return(spikes)
 	
+
+# code to find the appropriate range of depths from the surrounding bathymetry data
+def depth_limits(latitude, longitude, bath_lon, bath_lat, bath_height):
+	'''
+	latitude and longitude - parameters to give information about the position of the drop
+	
+	bath_lon, bath_lat, bath_height - give the information about the depth in the ocean for a
+									  given depth and position
+	'''
+	# lengths of the two arrays
+	n1 = len(bath_lat)
+	n2 = len(bath_lon)
+	
+	# identify the index for the profile location in the bathymetry data
+	i_cor = 0
+	j_cor = 0
+	for i in range(0,n1-1):
+		if (latitude >= bath_lat[i]) & (latitude < bath_lat[i+1]):
+			i_cor = i
+		else:
+			continue
+	for j in range(0,n2-1):
+		# converting longitude to appropriate scale
+		if (longitude < 0):
+			longitude = -longitude
+		if (longitude >= bath_lon[j]) & (longitude < bath_lon[j+1]):
+			j_cor = j
+		else:
+			continue
+	
+	# find the max and min depths in a given range of lat and long
+	diff = 3
+	depth_array = []
+	for i in range((i_cor-diff),(i_cor+diff)):
+		for j in range((j_cor-diff),(j_cor+diff)):
+			# try method to eliminate errors at boundaries	
+			try:
+				# storing all of the depth values
+				depth = abs(bath_height[i][j])
+				depth_array.append(depth)
+			except:
+				continue
+	
+	# finding the smallest and largest values of the depths from bathymetry
+	min_depth = min(depth_array)
+	max_depth = max(depth_array)	
+	return(min_depth)
+
+
+# code that will attempt to identify regions where the gradient variation decreases 
+def grad_var(data, gradient, threshold, consec):
+	'''
+	Function that identifies the lowest gradient and looks in the profile for points that
+	have gradients similiar enough to that value (up to some threshold)
+	
+	data and gradient are lists of data that are being fed into the function (to be used)
+
+	threshold - the detection threshold. This value should always be greater than 1
+
+	consec - the number of points after a given point you want to look at to calculate
+			 the variation (and mean) from
+	'''
+	
+	# finding region (with +- consec points around) with lowest gradient variation
+	gradvar_low = 999
+	n = len(gradient[:,1])
+
+	# looping through all of the points to find the one with the lowest gradient variation
+	for i in range(0,n):
+		# computing the mean 
+		mean = 0
+		length = 0
+		dev = 0
+		for j in range(i,i+consec):
+			try: 
+				mean = mean + gradient[j][1]
+				length += 1
+			except:
+				continue
+		mean = float(mean)/float(length)
+		# computing the standard deviation
+		for j in range(i,i+consec):
+			try:
+				dev = dev + (gradient[j][1]-mean)**2
+			except:
+				continue
+		dev = float(dev)/float(length)
+		# finding the point with the lowest standard deviation
+		if (dev < gradvar_low):
+			if (dev == 0):
+				continue
+			else:
+				gradvar_low = dev
+		else:
+			continue
+	
+	# looking for all of the points within some threshold of the lowest gradient variation
+	pointz = []
+	pointT = []
+	for i in range(0,n):
+		# compute the gradient variation in the consec range
+		mean_sample = 0
+		stddev_sample = 0
+		len_sample = 0
+		for j in range(i,i+consec):
+			try:
+				mean_sample = mean_sample + gradient[j][1]
+				len_sample += 1
+			except:
+				continue
+		mean_sample = float(mean_sample)/float(len_sample)
+		for j in range(i,i+consec):
+			try:
+ 				stddev_sample = stddev_sample + (gradient[j][1]-mean_sample)**2
+			except:
+				continue
+		stddev_sample = stddev_sample/float(len_sample)
+		# checking it is within some threshold, record temperature and depth
+		if ((stddev_sample/gradvar_low) < threshold):
+			if (i > (n-20)):
+				continue
+			else:
+				pointz.append(data[i][0])
+				pointT.append(data[i][1])
+		else:
+			continue
+		
+	# returning the points that fall within the threshold
+	grad_drop = np.column_stack((pointz,pointT))
+	return(grad_drop)
+
+
+# function to identify chains
+def find_chains(array, yn):
+	'''
+	Finds all of the 'chains' in an array (considered part of the same chain if the two consecutive
+	points are less than 10m apart
+
+	Prints information to user if yn == True, doesn't if yn == False
+	'''
+	n = len(array)
+	chain_start_index = []
+	chain_end_index = []
+
+	# finding the indices of the upper limit and lower limit
+	if (len(array) > 0):	
+		z_init = array[0][0]
+		onoff = 0
+		for i in range(0,n-1):
+			if (abs(z_init - array[i+1][0]) < 10):
+				if (onoff == 0):	
+					chain_start_index.append(i)		
+					onoff = 1
+			else:
+				if (onoff == 1):
+					chain_end_index.append(i)
+					onoff = 0
+			z_init = array[i+1][0] 
+	
+			# if it is the end of the array
+			if (i == (n-2)):
+				if (onoff == 1):
+					chain_end_index.append(n)
+					onoff = 0
+				else:
+					continue		
+
+	else:
+		if (yn == True):
+			print("No points in the array to filter")
+		return(array)
+
+	# checking lengths of the arrays are equal (if contintion met)	
+	if (yn == True):
+		print("Arrays are equal length: ", len(chain_start_index)==len(chain_end_index))
+		print(len(chain_start_index),len(chain_end_index))
+		print("length of array: ", n)
+		print('starting indices: ', chain_start_index)
+		print('ending indices: ', chain_end_index)
+	
+	# returning the starting and ending indices of the chains
+	if (len(chain_start_index) != 0):
+		return(chain_start_index, chain_end_index)	
+	else:
+		return(0)
+
+
+# function to remove points above limits set by bathymetry
+def remove_above(array, upper_lim, yn):
+	'''
+	Writing a code to remove all of the points for a given array that are above (or connected to a 
+	chain starting above) the lower limit of depth set by the bathymetry
+	
+	array - the array of data that you want to check (use with low_gradvar is ideal, and possibly 
+	the bad data array as well).
+
+	Other parameters are to locate the minimum depth set from bathymetry
+	'''
+	# pulling the function to find the number of chains
+	n = len(array)
+	filtered_array = []
+	y = find_chains(array, yn)
+	if (y != 0):
+		chain_start_index = y[0]
+		chain_end_index = y[1]
+		m = len(chain_start_index)
+	else:
+		m = 0
+
+	# removing points that are above the chain (not including them in the new array)
+	'''
+	Check the starting indices of each of the chains. If it is above the 'restricted' region, 
+	ignore and don't use the data (don't append to the filtered array). Otherwise, add the 
+	data to filtered_array. First loop is to find the index that should be defined as the 'cutoff'
+	'''
+	# if there is more than one chain
+	if (m > 1):
+		cutoff_index = chain_end_index[m-1]
+		# identifying the cutoff index
+		for i in range(0,m):
+			if (array[chain_start_index[i]][0] < upper_lim):
+				continue
+			else:
+				cutoff_index = chain_start_index[i]
+				break
+		# adding the range of points
+		for i in range(cutoff_index, n):
+			filtered_array.append([array[i][0],array[i][1]])
+		filtered_array = np.array(filtered_array)
+	# if there is exactly one chain
+	elif (m == 1):
+		if (array[0][0] > upper_lim):
+			for i in range(0,len(array)):
+				filtered_array.append([array[i][0],array[i][1]])
+		else:	
+			pass
+		filtered_array = np.array(filtered_array)
+	# no chains:
+	else:
+		filtered_array = np.array(array)
+		
+	# returning and printing a length change if the user wants this
+	if (yn == True):
+		print("length change: ",len(filtered_array),len(array))
+	return(filtered_array)
+			
 
 ######################################################################################################
 
@@ -534,61 +791,6 @@ def hit_predict(data, error_pts, pot_hb, bad_points, fraction, hb_depth):
 					frac = count/float(len(error_pts))
 					if (frac > fraction):
 						predHB = pot_hb[0][0]
-				
-					"""
-					# try all error points to find location	of hit bottom
-					else:
-						print("one entry is no good - going to look through error_pts")
-						for j in range(0,len(error_pts)):
-							print(str(j))
-							below = 0
-							# find correct index
-							eq_index = 0
-							for i in range(0,n):
-								if (error_pts[j][0]==data[i][0]):
-									eq_index = i
-								else:
-									continue
-					
-							for i in range(eq_index,n):
-								for k in range(0,len(error_pts)):
-									if (error_pts[k][0] == data[i][0]):
-										below = below + 1
-									else:
-										continue
-							frac_above = below/float(len(error_pts))
-							if (frac_above > fracAbove):
-								predHB = error_pts[j][0]
-							else: 
-								continue		
-						"""
-			"""
-			# if there is no predicted hit bottom location (try each point of the error points)
-			else:	
-				print("no potential hb points found - looking through error points")
-				for j in range(0,len(error_pts)):
-					print(str(j))
-					below = 0
-					# find correct index
-					eq_index = 0
-					for i in range(0,n):
-						if (error_pts[j][0]==data[i][0]):
-							eq_index = i
-						else:
-							continue
-
-					for i in range(eq_index,n):
-						for k in range(0,len(error_pts)):
-							if (error_pts[k][0] == data[i][0]):
-								below = below + 1
-							else:
-								continue
-					frac_above = below/float(len(error_pts))
-					if (frac_above > fracAbove):
-						predHB = error_pts[j][0]
-					else: 
-						continue
-				"""
 
 		except:
 			predHB = 0

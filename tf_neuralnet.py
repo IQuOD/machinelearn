@@ -96,12 +96,15 @@ def reduce_data(X,y):
 	return(X_filt,y_filt)
 
 
-# getting statistics for the network (F-Score)
-def statistics(predictions, Xtest, ytest, vb):
+# getting statistics for the network (detection fraction)
+def statistics(predictions, ztest, Ttest, ytest, filenames, vb, tf, filewrite):
 	'''
 	Uses metrics precision and recall, but can also give the true/false detection rates for
-	hit bottoms and non-hit bottom points. Note that all three of the inputs should have the
-	same length
+	hit bottoms and non-hit bottom points. Note that all three of the data inputs and the 
+	namefile array should have the same length
+	
+	The test for a true positive will be to look to see how many times the highest probability HB 
+	point is detecting the point closest to the true hit bottom location as scientifically QC'ed. 
 
 	The function returns the F score but will also print the other statistics used to measure
 	the success of a learning algorithm
@@ -109,129 +112,131 @@ def statistics(predictions, Xtest, ytest, vb):
 	The good (points that have been identified correctly) have a value of 1 in the array identIndex
 	and the points that were not identified correctly will have a zero value
 
-	vb is 1 if you want to print or 0 if you don't want to print stats to screen (will always 
-	print the F score)
+	vb is 1 if you want to print or 0 if you don't want to print stats to screen
+	
+	tf - parameter if you want to print the file names of those profiles that were identified 
+		 correctly to the screen
+	
+	file - parameter to indicate whether or not you want to write the undetected profiles to a file
 	'''
 	print('\n')
 	print("Generating statistics...")
 	m = len(predictions)
-	identIndex = np.zeros(m)
 
-	# true positive detection rate
-	trueHB = 0
-	detectHB = 0
-	for i in range(0,m):
-		# checking if the result is truly a "good" HB point
-		if (ytest[i] == 1):
-			trueHB += 1
-			# counting the number of points identified out of these
-			if (predictions[i][0] > predictions[i][1]):
-				detectHB += 1
-				identIndex[i] = 1
+	# filtering through the name array to identify unique profiles
+	unique_name = remove_repeats(filenames)
+	n = len(unique_name)
+	files_incorrect = []
+	
+	# threshold is the max depth difference between scientific QC and NN
+	threshold = 10
+
+	# creating variables for the stats
+	truepos = 0
+	trueneg = 0
+	falsepos = 0
+	falseneg = 0
+	
+	# looping through each profile to find the point of highest probability
+	for i in range(0,n):
+		# initialisation of parameters used in loop
+		name = unique_name[i]
+		HBindex = 0
+		HBprob = 0
+		HBz = 0
+		QCz = 0
+
+		# finding QC depth
+		for j in range(0,m):
+			if (filenames[j] == name):
+				if (ytest[j] == 1):
+					QCz = ztest[j]
+				else:
+					continue
 			else:
 				continue
-		else:
-			continue
-	true_pos = float(detectHB)/float(trueHB)
-	if (vb == 1):
-		print("True positive detection rate: "+str(true_pos))
 
-	# true negative detection rate
-	trueNeg = 0
-	detectNeg = 0
-	for i in range(0,m):
-		# checking all points that are not hit bottoms
-		if (ytest[i] == 0):
-			trueNeg += 1
-			# counting the number of these points that are identified as not HB points
-			if (predictions[i][1] > predictions[i][0]):
-				detectNeg += 1
-				identIndex[i] = 1
+		# initial loop to find the index of highest HB probability
+		for j in range(0,m):
+			if (filenames[j] == name):
+				# finding the index of the point with the highest probability
+				if (predictions[j][0] > HBprob):
+					HBindex = j
+					HBz = ztest[j]
+					HBprob = predictions[j][0]
+				else:
+					continue
 			else:
 				continue
-		else:
-			continue
-	true_neg = float(detectNeg)/float(trueNeg)
-	if (vb == 1):
-		print("True negative detection rate: "+str(true_neg))
 
-	# false positive rate
-	falsePos = 0
-	detectFalseNotHB = 0 
-	for i in range(0,m):
-		# checking all points that are not HB points
-		if (ytest[i] == 0):
-			falsePos += 1
-			# taking fraction that are actually detected as HB
-			if (predictions[i][0] > predictions[i][1]):
-				detectFalseNotHB += 1
+		# second loop to count statistics
+		for j in range(0,m):
+			if (filenames[j] == name):
+				# looking at points that are not the hit bottom
+				if (j != HBindex):
+					# counting true negatives
+					if (ytest[j] == 0):
+						trueneg += 1
+					# counting false negatives 
+					else:
+						falseneg += 1
+
+				# looking at the detected hit bottom point
+				else:
+					# counting true positives (if the difference in depths is less than a threshold)
+					if (abs(QCz - HBz) < threshold):
+						truepos += 1
+						# printing as a test if tf = True is met
+						if (tf == True):
+							print(name)
+							print(HBz,QCz)
+							print("\n")
+					# counting false positives
+					else:
+						falsepos += 1
 			else:
 				continue
+	
+		# recording if the depth of the detected HB is within a threshold of the scientific QC
+		if (abs(QCz-HBz)>threshold):
+			files_incorrect.append(name)
 		else:
 			continue
-	false_pos = float(detectFalseNotHB)/float(falsePos)
-	if (vb == 1):
-		print("False positive detection rate: "+str(false_pos))
-
-	# false negative rate
-	falseNeg = 0
-	detectFalseHB = 0
-	for i in range(0,m):
-		# checking all of the points that are HB
-		if (ytest[i] == 1):
-			falseNeg += 1
-			# taking fraction of these that are not detected as HB
-			if (predictions[i][1] > predictions[i][0]):
-				detectFalseHB += 1
-			else:
-				continue
-		else:
-			continue
-	false_neg = float(detectFalseHB)/float(falseNeg)
-	if (vb == 1):
-		print("False negative detection rate: "+str(false_neg))
-
-	# pulling out other statistics: precision, recall and F-Score
-	precision = float(detectHB)/float(detectHB+detectFalseNotHB)
-	recall = float(detectHB)/float(detectFalseHB+detectHB)
+	
+	# pulling out statistics
+	trueposRate = truepos/float(m)
+	truenegRate = trueneg/float(m)
+	falseposRate = falsepos/float(m)
+	falsenegRate = falseneg/float(m)
+	precision = trueposRate/float(trueposRate+falsenegRate)
+	recall = trueposRate/float(truenegRate+trueposRate)
 	Fscore = float(2*precision*recall)/float(precision+recall)
 
-	# printing to screen the results of this statistics call
-	if (vb == 1):
-		print("Precison: "+str(precision))
-		print("Recall: "+str(recall))
-	print("F-score: "+str(Fscore))	
-	print("\n")
+	# printing out statistics to terminal
+	if (vb == True):
+		print("total number of points: "+str(m))
+		print("true positives: "+str(truepos))
+		print("true negatives: "+str(trueneg))
+		print("false positives: "+str(falsepos))
+		print("false negatives: "+str(falseneg))
+		print("precision: "+str(precision))
+		print("recall: "+str(recall))
+		print("F-score: "+str(Fscore))
+		print("Statistics generated\n")
+	else:
+		print("Statistics generated (not printed)\n")
 
-	return(Fscore, identIndex)
+	# writing file if filewrite == True
+	if (filewrite == True):
+		f = open('nn_filecheck.txt','w')
+		for i in range(0,len(files_incorrect)):
+			f.write(files_incorrect[i]+"\n")
+		f.close
+	else:
+		pass
 
-
-# function to print the remaining 
-def files_remaining(filename_test, y_test, pred):
-	'''
-	This function takes the results of the neural network and writes a new file which has the
-	filenames of the profiles that were not correctly identified (false positive or negative profiles)
-	This is used so that these can be plotted for re-examination
-	'''
-	print("Writing file of incorrectly identified profile names...")
-	n = len(filename_test)
-	files = []
-	f = open('nn_incorrect_classification.txt','w+')
-	
-	# looping through points to select points not identified correctly
-	for i in range(0,n):
-		if (y_test[i] == 1):
-			if (pred[i][0] < pred[i][1]):
-				f.write(filename_test[i]+"\n")
-				files.append(filename_test[i])
-			else:
-				continue
-		else:
-			continue	
-
-	f.close()
-	print("Writing complete")
-	return(files)
+	# returning key metric and list of the profiles that have been identified correctly
+	return(precision, files_incorrect)
 
 
 # function to take an array and remove the repeated elements from that array
@@ -264,22 +269,24 @@ def remove_repeats(array):
 	return(output_array)
 
 # function for printing and outputting the statistics
-def results(filename_test, tf):
+def results(filename_test, undetected_profiles, tf):
 	'''
 	This can potentially be moved into a function evaluation of the performance with 
 	another metric - that is visual inspection of all of the test profiles to see if 
 	the machine identified hit bottom location can be determined to within some threshold.
 
 	Counting to gather statistics on the success rate of the model
+
+	tf - parameter with True or False input - plots profile if tf = True
 	'''
+
 	# initialise file name list
-	filearray = remove_repeats(filename_test)
-	n = len(filearray)
+	filearray = undetected_profiles
+	n = len(undetected_profiles)
 
 	# setting up statistics for counting the success rate of the test set
 	correct = 0
 
-	print('\n')
 	print('Plotting profiles and collecting statistics')
 	# looping for printing
 	for i in range(0,n):
@@ -289,6 +296,7 @@ def results(filename_test, tf):
 		# plotting temperature
 		if (tf == True):
 			plt.figure(figsize=(11.5,9))
+			plt.subplot(1,2,1)
 			plt.plot(data[:,1],data[:,0])
 			plt.ylabel("Depth [m]")
 			plt.xlabel("Temperature [degrees C]")
@@ -303,7 +311,7 @@ def results(filename_test, tf):
 				else:
 					continue
 		# plotting points that have high probability of being HB (as computed by NN)
-		m = len(pred)
+		m = len(filename_test)
 		points = []
 		for j in range(0,m):
 			if (filename == filename_test[j]):
@@ -345,12 +353,40 @@ def results(filename_test, tf):
 			plt.plot(high_T,high_z,'bo')
 			plt.plot(max_T,max_z,'ro')
 
+		# plotting gradient
+		if (tf == True):
+			plt.subplot(1,2,2)
+			plt.plot(gradient[:,1], gradient[:,0])
+			plt.ylabel("Depth [m]")
+			plt.xlabel("Temperature Gradient [degrees C/m]")
+			plt.gca().invert_yaxis()
+			plt.title("dTdz")	
+		# plotting HB depth (as flagged by QC)
+		if (tf == True):
+			for i in range(0,len(flags.flag)):
+				if (flags.flag[i] == "HB"):
+					ref = flags.depth[i]
+					plt.axhline(y=ref, hold=None, color='r')
+				else:
+					continue
+		# plotting detected points onto gradient plots
+		if (tf == True):
+			plt.axhline(y=max_z, hold=None, color='g')
+
 		# collecting statistics
 		for i in range(0,len(flags.flag)):
 			if (flags.flag[i] == "HB"):
 				ref = flags.depth[i]
-				if (abs(max_z-ref) < 20):
+				# choose threshold for detection
+				if (abs(max_z-ref) < 10):
 					correct += 1
+
+		# printing the difference in the depth of the flagged and identified points
+		print(filename)
+		print("flagged HB depth: "+str(ref))
+		print("detected HB depth: "+str(max_z))
+		print("difference: "+str(abs(max_z-ref))) 
+		print("\n")
 
 		# plotting if tf == True
 		if (tf == True):
@@ -366,10 +402,14 @@ def results(filename_test, tf):
 # setting up data for feeding into neural network
 
 # checking to see if model already exists
-if (os.path.isfile('xbt_nn1.tfl.index') == True):
-	model.load('xbt_nn1.tfl')
+if (os.path.isfile('net.tflearn.index') == True):
+	print("\nExisting neural network model found")
+	print("loading...\n")
+	model.load('net.tflearn')
 
 else:
+	print("\nneural network model not found")
+	print("training new neural network...\n")
 	# importing the training set data
 	dat1 = []
 	with open("nn_complete_training.txt") as f:
@@ -439,7 +479,6 @@ X_val = X_new
 y_val = y_new
 
 # printing out dimensions of the training data
-print("\n")
 print("Data dimensions:")
 print("Input:",len(X_train),len(X_train[0]))
 print("Outputs:",len(y_train),len(y_train[0]))
@@ -449,7 +488,7 @@ print("\n")
 # running neural network with tflearnS
 
 # checking to see if model already exists
-if (os.path.isfile('xbt_nn1.tfl.index') == True):
+if (os.path.isfile('net.tflearn.index') == True):
 	pass
 
 else:
@@ -463,18 +502,16 @@ else:
 	model = tflearn.DNN(net)
 	model.fit(X_train,y_train, n_epoch=25, validation_set = (X_val, y_val), \
 				show_metric=True, run_id="XBT hit bottom data")
+	#model.save('net.tflearn')
 
 # using model to make predictions on test set
 pred = model.predict(X_test)
 
 # collecting key statistics on the data
-[Fscore, identIndex] = statistics(pred, X_test, y_test, 1)
-
-# function to remove the test data correctly identified by the neural network
-incorrect_files = files_remaining(filename_test, y_test, pred)
+[precision, files_incorrect] = statistics(pred, z_test, T_test, y_test, filename_test, 1, 0, 1)
 
 # evaluation of the neural network
-results(filename_test, False)
+results(filename_test, files_incorrect, False)
 
 
 ######################################################################################################

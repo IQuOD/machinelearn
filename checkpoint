@@ -1,2 +1,2 @@
-model_checkpoint_path: "xbt_nn.tfl"
-all_model_checkpoint_paths: "xbt_nn.tfl"
+model_checkpoint_path: "net.tflearn"
+all_model_checkpoint_paths: "net.tflearn"

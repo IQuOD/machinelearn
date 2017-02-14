@@ -41,6 +41,7 @@ Reading files or plotting (non-computational):
 import numpy as np
 import pandas as pd
 import math
+import time
 import os.path
 import sys, getopt
 import matplotlib.pyplot as plt
@@ -57,7 +58,7 @@ path = "../HBfiles/"
 
 # taking sample of files from the name file
 #namefile = open("HBfiles_golden.txt","r")
-namefile = open("nn_incorrect_classification.txt","r")
+namefile = open("nn_filecheck.txt","r")
 name_array = []
 for line in namefile:
 	line = line.rstrip()
@@ -82,7 +83,11 @@ for i in range(0,len(name_array)):
 	dTspike = hb.grad_spike(data, gradient, 3)
 	pot_hb = hb.concat(Tspike,dTspike)
 	bathydepth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, filename)
+	low_gradvar = hb.grad_var(data, gradient, 5, 100)
+	up_lim = hb.depth_limits(latitude, longitude, bath_lon, bath_lat, bath_height)
+	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, filename, 
+				 low_gradvar, up_lim)
+	print("\n")
 
 
 ######################################################################################################

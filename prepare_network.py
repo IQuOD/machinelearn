@@ -46,6 +46,8 @@ import math
 import random
 import os.path
 import neuralnet as nn
+import sys
+import time
 import matplotlib.pyplot as plt
 from netCDF4.utils import ncinfo
 from netCDF4 import Dataset
@@ -66,7 +68,7 @@ def prepare_network(ii, bad_data, gradSpike, TSpike, data, gradient, bathy_depth
 	and remove the 25% on either side. Then, the difference between the upper and lower values divided
 	by 1.34 [(u-l)/1.34] gives the RMS standard deviation - Edward King (edward.king@csiro.au) 
 		
-	Removed since it only applies to Gaussian distributed data
+	Removed since it only applies to Gaussian distributed datas
 
 	sortedGrad = gradient
 	quickSort(sortedGrad[:,1])
@@ -148,31 +150,208 @@ def prepare_network(ii, bad_data, gradSpike, TSpike, data, gradient, bathy_depth
 	return([HBpoint, dev, fraction, zdiff])
 		
 
-# algorithm to remove repeats and sort based on depth
-def sortPls(array):
+# function to return the total number of points that are lowvar and bad data
+def lowvar_point_count(low_gradvar, bad_data):
+	'''
+	This function is to be used in conjunction with the following function to generate the new
+	updated set of features that should assist the neural network in identifying the location of 	
+	the hit bottom
+	'''	
+	# initialisation
+	n1 = len(low_gradvar)
+	n2 = len(bad_data)
+	count = 0
 
-	# removing repeats
-	n = len(array)
-	hold = array
-	lifeSorted = []
-	lifeSorted.append(list(hold[0]))
-	for i in range(1,n):
-		repeats = 0
-		for j in range(0,len(lifeSorted)):
-			if (hold[i][0] != lifeSorted[j][0]):
+	# assuming that the length of neither array is 0
+	if ((n1 != 0) & (n2 != 0)):
+		# setting up for loops to count matches (incrementing count variable)
+		for i in range(0,n1):
+			for j in range(0,n2):
+				if (low_gradvar[i][0] == bad_data[j][0]):
+					count += 1
+				else:
+					continue
+
+		# returning the count
+		return(count)
+
+	else:
+		count = 1
+		return(count)
+
+# adding additional features to the data
+def additional_features(ii, data, gradient, init_bad_data,
+						bath_lon, bath_lat, bath_height, longitude, latitude,
+						low_gradvar, bad_data, total_lowvar, upper_lim):
+	'''
+	After the initial neural network was implemented and we had another look at the remaining
+	profiles, we found new features that can be used to improve the performance of the neural net
+
+	ii - is the index of the point in the profile
+	
+	yn - yes or no to whether or not you want to remove all points and chains above the minimum bathy
+		 depth (True or False instead of yes/no)
+
+	filt_low_gradvar/filt_bad_data - arrays that have been pre-filtered (points above the limit from
+	bathymetry removed)
+	'''
+	# identifying the depth and temperature of this point
+	z = init_bad_data[ii][0]
+	T = init_bad_data[ii][1]
+	
+	# NN FEATURE
+	# if the point is at the top of a low gradient variation chain, increase probability
+	top_gradvar = 0
+	out = hb.find_chains(low_gradvar, False)
+	if (out != 0):
+		chain_start = out[0]
+		chain_end = out[0]
+		m = len(chain_start)
+	else:
+		m = 0
+	# giving those points close to the top of a chain a higher value of top_gradvar
+	if (m > 0):
+		top_chain_depth = []
+		for i in range(0,m):
+			# if the point is above the upper limit (not approved)
+			if (low_gradvar[chain_start[i]][0] < upper_lim):
 				continue
 			else:
-				repeats = repeats + 1
-		if (repeats == 0):
-			lifeSorted.append(list(hold[i]))
-		else:
-			continue
-	lifeSorted = np.array(lifeSorted)
+				top_chain_depth.append(low_gradvar[chain_start[i]][0])
+		# if the depth is close to the top chain depth, give it an increased value
+		m1 = len(top_chain_depth)
+		for i in range(0,m1):
+			if (abs(z-top_chain_depth[i]) < 3):
+				top_gradvar = 1
+			elif (abs(z-top_chain_depth[i]) < 20):
+				top_gradvar = 0.5
+			else:
+				continue
+	else:
+		pass
+	
+	# NN FEATURE
+	# finding the points near the top of a "bad data" chain
+	top_baddata = 0
+	out_bad = hb.find_chains(bad_data, False)
+	if (out_bad != 0):
+		chain_start = out_bad[0]
+		chain_end = out_bad[0]
+		m = len(chain_start)
+	else:
+		m = 0
+	# giving those points close to the top of a chain a higher value of top_gradvar
+	if (m > 0):
+		top_chain_depth = []
+		for i in range(0,m):
+			# if the point is above the upper limit (not approved)
+			if (bad_data[chain_start[i]][0] < upper_lim):
+				continue
+			else:
+				top_chain_depth.append(bad_data[chain_start[i]][0])
+		# if the depth is close to the top chain depth, give it an increased value
+		m2 = len(top_chain_depth)
+		for i in range(0,m2):
+			if (abs(z-top_chain_depth[i]) < 3):
+				top_baddata = 1
+			elif (abs(z-top_chain_depth[i]) < 20):
+				top_baddata = 0.5
+			else:
+				continue
+	else:
+		pass
+	
+	# NN FEATURE
+	'''	
+	getting the number of overlapping (bad data and low variation) points below the point
+	as a fraction of the total number of points (concatenated) - will subtract the number 
+	of points above the point as well
+	'''
 
-	# sorting in ascending order	
-	quickSort(lifeSorted[:,0])
+	# initialisation
+	frac_both_below = 0
+	n1 = len(bad_data)
+	n2 = len(low_gradvar)
 
-	return(lifeSorted)
+	# setting up looping system
+	m = len(init_bad_data)
+	consec_aft = int(m/float(10))
+	try: 
+		up = z
+		low = init_bad_data[ii+consec_aft][0]
+	except:
+		up = z
+		low = init_bad_data[m-1][0]		
+	
+	# doing the counting
+	if (n1 != 0) & (n2 != 0):
+		count = 0
+		above = 0
+		for i in range(0,n1):
+			for j in range(0,n2):
+				if (bad_data[i][0] == low_gradvar[j][0]):
+					if (bad_data[i][0] < up):
+						above += 1
+					if ((bad_data[i][0] > up) & (bad_data[i][0] < low)):
+						count += 1
+					else:
+						continue
+				else:
+					continue
+		# computing the denominator
+		try:
+			frac_both_below = float(count - above)/float(total_lowvar)
+		except:
+			frac_both_below = 0
+	else:
+		pass
+	
+	# NN FEATURE
+	# depth of the point as a fraction of the entire profile depth
+	deep = init_bad_data[m-1][0]
+	place = float(init_bad_data[ii][0])/float(deep)
+
+	# returning the features to be fed into the neural network
+	return(top_gradvar, top_baddata, frac_both_below, place)
+
+
+# algorithm to remove repeats and sort based on depth
+def sortPls(array):
+	''' 
+	Code to eliminate repeats in an array and then sorting it from low to high depth	
+	'''
+	
+	# testing length of array
+	n = len(array)
+
+	# ensuring that input array is non-zero in length
+	if (n > 0):
+		# removing repeats
+		hold = array
+		lifeSorted = []
+		lifeSorted.append(list(hold[0]))
+		for i in range(1,n):
+			repeats = 0
+			for j in range(0,len(lifeSorted)):
+				if (hold[i][0] != lifeSorted[j][0]):
+					continue
+				else:
+					repeats = repeats + 1
+			if (repeats == 0):
+				lifeSorted.append(list(hold[i]))
+			else:
+				continue
+
+		# sorting in ascending order	
+		lifeSorted = sorted(lifeSorted)
+		lifeSorted = np.array(lifeSorted)
+
+		return(lifeSorted)
+	
+	# if length of array input is zero
+	else:
+		print("Failed to sort input")
+		return(array)
 
 
 # defining function to extract expected output (for neural network training)
@@ -246,6 +425,25 @@ def partition (alist,first,last):
 	return rightmark
 
 
+# Print iterations progress
+def printProgressBar(iteration,total,prefix='',suffix='',decimals=1,length=100,fill='#'):
+	''' 
+	Progress bar taken from stack overflow (thank you kind stranger "Greenstick")
+	'''
+	# initialisation of the bar
+	percent = ("{0:."+str(decimals)+"f}").format(100*(iteration/float(total)))
+	filledLength = int(length*iteration//total)
+	bar = fill*filledLength+"-"*(length-filledLength)
+	print('\r%s |%s| %s%% %s'%(prefix,bar,percent,suffix),end='\r')
+
+	# print new line on complete
+	if iteration == total:
+		print('\r%s |%s| %s%% %s'%(prefix,bar,percent,suffix),end='\r')
+
+	# there is nothing to actually return here
+	return(0)
+
+
 # code to reduce the poor data
 def reduce_data(X,y):
 	'''
@@ -316,14 +514,16 @@ path = "../HBfiles/"
 
 # taking sample of files from the name file
 namefile = open("testset.txt","r")
+print("Opening file to pull neural network input data from...")
 name_array = []
 file_names = []
 for line in namefile:
 	line = line.rstrip()
-	file_names.append(line)
+	file_names.append(str(line))
 	name = str(path+line)
 	name_array.append(name)
 namefile.close()
+n = len(name_array)
 
 
 ######################################################################################################
@@ -347,12 +547,13 @@ OUTPUTS:
  - true or false
 """
 
-# checking code
-n = len(name_array)
+# initialisation
+print("Writing features to file")
 
 # writing to file
 f = open('nn_test_data.txt','w')
-f.write('expected_output,HBpoint,dev,fraction,zdiff,filename,depth,temp\n')
+f.write('expect_output,HBpoint,dev,fraction,zdiff,filename,depth,temp,top_gradvar,top_bad,fracBothBelow,place\n')
+
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
@@ -360,42 +561,62 @@ f.write('expected_output,HBpoint,dev,fraction,zdiff,filename,depth,temp\n')
 for i in range(0,n):
 	filename = name_array[i]
 	raw_name = file_names[i]
-	print("Iterating through file "+str(i)+" ("+str(filename)+"):")
+	print("\n")
+	print("File: "+str(raw_name)+" ("+str(i)+")")
 	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
 	
 	# getting all of the potential error points
+	bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 	gradSpike = hb.grad_spike(data, gradient, 3)
 	TSpike = hb.T_spike(data, 0.05)
 	const = hb.const_temp(data, gradient, 100, 0.001)
 	inc = hb.temp_increase(data, 50)
-	extra_bad_data = hb.concat(const, inc, gradSpike, TSpike)
+	low_gradvar = hb.grad_var(data, gradient, 5, 100)
+	extra_bad_data = hb.concat(const, inc, gradSpike, TSpike, low_gradvar)
+	const_bad_data_init = hb.concat(const, inc)
+
+	# sorting and removing repeats (aditional step to ensure it has occured for all key data)
+	low_gradvar = sortPls(low_gradvar)
+	extra_bad_data = sortPls(extra_bad_data)
+	const_bad_data_init = sortPls(const_bad_data_init)
+	total_lowvar = lowvar_point_count(low_gradvar, const_bad_data_init)
+	
+	# filtering through data to remove all the points that are above upper bathymetry depth
+	upper_lim = hb.depth_limits(latitude, longitude, bath_lon, bath_lat, bath_height)
+	filt_low_gradvar = hb.remove_above(low_gradvar, upper_lim, False)
+	filt_extra_bad_data = hb.remove_above(extra_bad_data, upper_lim, False)
+	low_gradvar = filt_low_gradvar
+	extra_bad_data = filt_extra_bad_data
 
 	if (type(extra_bad_data) == type(np.array([0,0,0]))) & (len(extra_bad_data) != 0):
 
 		# sorting and removing all of the repeats in bad data
 		bad_data = sortPls(extra_bad_data)
+		const_bad_data = sortPls(const_bad_data_init)
 	
 		# looping through each data point
 		m = len(bad_data[:,0])
 		for j in range(0,m):
-			bathy_depth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
-		
+
+			# printing update bar
+			printProgressBar(j,m-1,prefix="	Progress: line "+str(j)+" ",suffix="Complete",length=50)
+
 			# these are the neural network inputs and outputs
 			nnInput = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth)
 			nnInput = nn.feature_scaling(nnInput)
+			nnInput2 = additional_features(j, data, gradient, bad_data,
+										  bath_lon, bath_lat, bath_height, longitude, latitude,
+										  low_gradvar, const_bad_data, total_lowvar, upper_lim)
 			nnOutput = nn_out(bad_data, hb_depth, j)
-			if (nnOutput == 1):		
-				print(nnOutput, nnInput, raw_name)
 		
 			# writing parameters to file
 			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+','
 					+str(nnInput[2])+','+str(nnInput[3])+','+str(raw_name)	
-					+','+str(bad_data[j][0])+','+str(bad_data[j][1])+'\n')	
+					+','+str(bad_data[j][0])+','+str(bad_data[j][1])
+					+str(nnInput2[0])+','+str(nnInput2[1])+','+str(nnInput2[2])+','+str(nnInput2[3])+'\n')
 
 	else:
 		continue
-
-	print("\n")
 
 # completed writing parameters from the training set
 f.close()

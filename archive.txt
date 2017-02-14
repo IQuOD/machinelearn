@@ -270,11 +270,232 @@ Find that the 3 sigma threshold for detections is the most ideal for determining
 ######################################################################################################
 ######################################################################################################
 
+	'''
+	# true positive detection rate
+	trueHB = 0
+	detectHB = 0
+	for i in range(0,m):
+		# checking if the result is truly a "good" HB point
+		if (ytest[i] == 1):
+			trueHB += 1
+			# counting the number of points identified out of these
+			if (predictions[i][0] > predictions[i][1]):
+				detectHB += 1
+				identIndex[i] = 1
+			else:
+				continue
+		else:
+			continue
+	true_pos = float(detectHB)/float(trueHB)
+	if (vb == 1):
+		print("True positive detection rate: "+str(true_pos))
+
+	# true negative detection rate
+	trueNeg = 0
+	detectNeg = 0
+	for i in range(0,m):
+		# checking all points that are not hit bottoms
+		if (ytest[i] == 0):
+			trueNeg += 1
+			# counting the number of these points that are identified as not HB points
+			if (predictions[i][1] > predictions[i][0]):
+				detectNeg += 1
+				identIndex[i] = 1
+			else:
+				continue
+		else:
+			continue
+	true_neg = float(detectNeg)/float(trueNeg)
+	if (vb == 1):
+		print("True negative detection rate: "+str(true_neg))
+
+	# false positive rate
+	falsePos = 0
+	detectFalseNotHB = 0 
+	for i in range(0,m):
+		# checking all points that are not HB points
+		if (ytest[i] == 0):
+			falsePos += 1
+			# taking fraction that are actually detected as HB
+			if (predictions[i][0] > predictions[i][1]):
+				detectFalseNotHB += 1
+			else:
+				continue
+		else:
+			continue
+	false_pos = float(detectFalseNotHB)/float(falsePos)
+	if (vb == 1):
+		print("False positive detection rate: "+str(false_pos))
+
+	# false negative rate
+	falseNeg = 0
+	detectFalseHB = 0
+	for i in range(0,m):
+		# checking all of the points that are HB
+		if (ytest[i] == 1):
+			falseNeg += 1
+			# taking fraction of these that are not detected as HB
+			if (predictions[i][1] > predictions[i][0]):
+				detectFalseHB += 1
+			else:
+				continue
+		else:
+			continue
+	false_neg = float(detectFalseHB)/float(falseNeg)
+	if (vb == 1):
+		print("False negative detection rate: "+str(false_neg))
+
+	# pulling out other statistics: precision, recall and F-Score
+	precision = float(detectHB)/float(detectHB+detectFalseNotHB)
+	recall = float(detectHB)/float(detectFalseHB+detectHB)
+	Fscore = float(2*precision*recall)/float(precision+recall)
+
+	# printing to screen the results of this statistics call
+	if (vb == 1):
+		print("Precison: "+str(precision))
+		print("Recall: "+str(recall))
+	print("F-score: "+str(Fscore))	
+	print("\n")
+	'''
+
+######################################################################################################
+######################################################################################################
+
+					"""
+					# try all error points to find location	of hit bottom
+					else:
+						print("one entry is no good - going to look through error_pts")
+						for j in range(0,len(error_pts)):
+							print(str(j))
+							below = 0
+							# find correct index
+							eq_index = 0
+							for i in range(0,n):
+								if (error_pts[j][0]==data[i][0]):
+									eq_index = i
+								else:
+									continue
+					
+							for i in range(eq_index,n):
+								for k in range(0,len(error_pts)):
+									if (error_pts[k][0] == data[i][0]):
+										below = below + 1
+									else:
+										continue
+							frac_above = below/float(len(error_pts))
+							if (frac_above > fracAbove):
+								predHB = error_pts[j][0]
+							else: 
+								continue		
+						"""
+			"""
+			# if there is no predicted hit bottom location (try each point of the error points)
+			else:	
+				print("no potential hb points found - looking through error points")
+				for j in range(0,len(error_pts)):
+					print(str(j))
+					below = 0
+					# find correct index
+					eq_index = 0
+					for i in range(0,n):
+						if (error_pts[j][0]==data[i][0]):
+							eq_index = i
+						else:
+							continue
+
+					for i in range(eq_index,n):
+						for k in range(0,len(error_pts)):
+							if (error_pts[k][0] == data[i][0]):
+								below = below + 1
+							else:
+								continue
+					frac_above = below/float(len(error_pts))
+					if (frac_above > fracAbove):
+						predHB = error_pts[j][0]
+					else: 
+						continue
+				"""
+
+######################################################################################################
+######################################################################################################
+
+	# this code finds where the variation in the gradient is low
+	# need to change it to find the regions where the deviation in the gradient is near the 
+	# lowest values in the profile
+	'''
+	# calculation of the mean and standard deviation for that profile
+	mean = sum(gradient[:,1])/float(len(gradient[:,1]))
+	stddev = 0	
+	n = len(gradient[:,1])
+	for i in range(0,n):
+		stddev = stddev + (float(gradient[i][1])-float(mean))**2
+	stddev = stddev/float(len(gradient[:,1]))
+
+	# finding the average gradient value over a specified range of points
+	pointz = []
+	pointT = []
+	n = len(gradient[:,1])
+	for i in range(0,n-consec):
+		# mean and std.dev initialisation
+		mean_sample = sum(gradient[i:i+consec,1])/float(consec)
+		stddev_sample = 0
+		# computing the standard dev for the next consec points
+		for j in range(0,consec):
+			stddev_sample = stddev_sample + (float(gradient[i+j][1])-float(mean_sample))**2
+		stddev_sample = stddev_sample/float(consec)
+		
+		# saving the points that are within the threshold
+		if (float(stddev_sample)/float(stddev) < threshold):
+			pointz.append(float(data[i][0]))
+			pointT.append(float(data[i][1]))
+	
+	# returning the points that fall within the threshold
+	grad_drop = np.column_stack((pointz,pointT))
+	return(grad_drop)
+	'''
+
+######################################################################################################
+######################################################################################################
+
 
 
 ######################################################################################################
 ######################################################################################################
 
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
+
+
+
+######################################################################################################
+######################################################################################################
 
 
 ######################################################################################################

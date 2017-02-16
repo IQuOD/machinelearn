@@ -269,7 +269,7 @@ def remove_repeats(array):
 	return(output_array)
 
 # function for printing and outputting the statistics
-def results(filename_test, undetected_profiles, tf):
+def results(filename_test, undetected_profiles, pred, z_test, T_test, tf):
 	'''
 	This can potentially be moved into a function evaluation of the performance with 
 	another metric - that is visual inspection of all of the test profiles to see if 
@@ -381,137 +381,24 @@ def results(filename_test, undetected_profiles, tf):
 				if (abs(max_z-ref) < 10):
 					correct += 1
 
-		# printing the difference in the depth of the flagged and identified points
-		print(filename)
-		print("flagged HB depth: "+str(ref))
-		print("detected HB depth: "+str(max_z))
-		print("difference: "+str(abs(max_z-ref))) 
-		print("\n")
-
 		# plotting if tf == True
 		if (tf == True):
+			print(filename)
+			print("flagged HB depth: "+str(ref))
+			print("detected HB depth: "+str(max_z))
+			print("difference: "+str(abs(max_z-ref))) 
+			print("\n")
 			plt.show()
 
 	# returning statistics
+	'''
+	This correct detection rate metric for measuring performance is not yet useful - stick to the 
+	precision and recall metrics from the previous function
+	'''
 	correct_rate = correct/float(n)
-	print("Correct detection rate: "+str(correct_rate))
+	#print("Correct detection rate: "+str(correct_rate))
+	print("Results completed\n")
 	return(correct_rate)
-
-
-######################################################################################################
-# setting up data for feeding into neural network
-
-# checking to see if model already exists
-if (os.path.isfile('net.tflearn.index') == True):
-	print("\nExisting neural network model found")
-	print("loading...\n")
-	model.load('net.tflearn')
-
-else:
-	print("\nneural network model not found")
-	print("training new neural network...\n")
-	# importing the training set data
-	dat1 = []
-	with open("nn_complete_training.txt") as f:
-		next(f)
-		for line in f:
-			dat1.append([x.strip() for x in line.split(",")])
-
-	tr = [1, 0]
-	fls = [0, 1]
-	y_train = []
-	X_train = []
-	filename_train = []
-	n1 = len(dat1)
-	for i in range(0,n1):
-		X_train.append([float(dat1[i][1]),float(dat1[i][2]),float(dat1[i][3]),float(dat1[i][4])])	
-		filename_train.append(dat1[i][5])
-		if (int(dat1[i][0]) == 1):
-			y_train.append(tr)
-		else:
-			y_train.append(fls)
-
-	# importing cross validation data
-	dat2 = []
-	with open("nn_crossvalidation_data.txt") as f:
-		next(f)
-		for line in f:
-			dat2.append([x.strip() for x in line.split(",")])
-
-	y_val = []
-	X_val = []
-	filename_crossval = []
-	n2 = len(dat2)
-	for i in range(0,n2):
-		X_val.append([float(dat2[i][1]),float(dat2[i][2]),float(dat2[i][3]),float(dat2[i][4])])	
-		filename_crossval.append(dat2[i][2])
-		if (int(dat2[i][0]) == 1):
-			y_val.append(tr)
-		else:
-			y_val.append(fls)
-
-# importing test data
-dat3 = []
-with open("nn_test_data.txt") as f:
-	next(f)
-	for line in f:
-		dat3.append([x.strip() for x in line.split(",")])
-
-filename_test = []
-X_test = []
-y_test = []
-z_test = []
-T_test = []
-n3 = len(dat3)
-for i in range(0,n3):
-	filename_test.append(dat3[i][5])
-	X_test.append([float(dat3[i][1]),float(dat3[i][2]),float(dat3[i][3]),float(dat3[i][4])])
-	y_test.append(int(dat3[i][0]))
-	z_test.append(float(dat3[i][6]))
-	T_test.append(float(dat3[i][7]))
-
-# filtering through the data to remove majority of poor points
-[X_new, y_new] = reduce_data(X_train,y_train)
-X_train = X_new
-y_train = y_new
-[X_new, y_new] = reduce_data(X_val,y_val)
-X_val = X_new
-y_val = y_new
-
-# printing out dimensions of the training data
-print("Data dimensions:")
-print("Input:",len(X_train),len(X_train[0]))
-print("Outputs:",len(y_train),len(y_train[0]))
-print("\n")
-
-######################################################################################################
-# running neural network with tflearnS
-
-# checking to see if model already exists
-if (os.path.isfile('net.tflearn.index') == True):
-	pass
-
-else:
-	# testing the tflearn reading data function
-	net = tflearn.input_data(shape=[None,4])
-	net = tflearn.fully_connected(net, 5, activation='sigmoid')
-	net = tflearn.fully_connected(net, 2, activation='softmax')
-	net = tflearn.regression(net)
-
-	# creating the model
-	model = tflearn.DNN(net)
-	model.fit(X_train,y_train, n_epoch=25, validation_set = (X_val, y_val), \
-				show_metric=True, run_id="XBT hit bottom data")
-	#model.save('net.tflearn')
-
-# using model to make predictions on test set
-pred = model.predict(X_test)
-
-# collecting key statistics on the data
-[precision, files_incorrect] = statistics(pred, z_test, T_test, y_test, filename_test, 1, 0, 1)
-
-# evaluation of the neural network
-results(filename_test, files_incorrect, False)
 
 
 ######################################################################################################

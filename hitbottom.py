@@ -121,14 +121,17 @@ def plot_data(plot, data, gradient, flags, bathydepth, error_pts, pot_hb,
 	# plotting "bad data" if true
 	if (plot == True):
 		plt.plot(error_pts[:,1],error_pts[:,0],'bo')	
+		pass
 
 	# plotting the points of potential HB event if true
 	if (plot == True):
 		plt.plot(pot_hb[:,1],pot_hb[:,0],'ro')
-
+		pass
+	
 	# plotting points of low gradient variation
 	if (plot == True):
 		plt.plot(low_gradvar[:,1],low_gradvar[:,0],'yo')
+		pass
 
 	plt.ylabel("Depth [m]")
 	plt.xlabel("Temperature [degrees C]")
@@ -222,57 +225,6 @@ This section of code is a logic checking implementation to attempt
 to detect hit bottoms for XBT drops.
 These should all return a list of points (and associated temperature values)s
 """
-
-# finding characteristic gradient increase spike for hit bottoms
-def grad_spike(data, gradient, threshold):
-	"""
-	threshold: is the number of standard deviations away from the mean gradient value you 
-	want to use for identifying a spike (IDENTIFIED 3 IS MOST IDEAL)
-	
-	Using large positive gradient spikes to identify whether or not there is a peak
-	Wire breaks tend to have high temperature after gradient peak, so remove those
-	with higher temp after peak
-	Note that this is only to identify clear, large spikes in grad (one property of HB data)
-	"""
-	# importing key data from nested lists
-	n = len(data[:,1])
-	m = len(gradient[:,1])
-	
-	# calculate average gradient value
-	if (m != 0):
-		dt_av = sum(gradient[:,1])/float(m)
-	else:
-		dt_av = 999
-
-	# calculate standard deviation in the gradient (average)
-	"""	
-	Note that this method of finding the standard deviation is not truly good for profiles
-	observable trends in dT (overall trend needs to be subtracted)
-	"""
-	sq_dev = 0
-	for i in range(0,m):
-		sq_dev = sq_dev + (dt_av - gradient[i][1])**2
-	if (m != 0):	
-		std_dev = np.sqrt(sq_dev/float(m))
-	
-		"""
-		Finding large peaks (3 std.dev away from average chosen arbitrarily, T must decrease)
-		"""	
-		global dTdz_peaks
-		z_peak = []
-		T_peak = []
-		for i in range(0,m):
-			if (abs(gradient[i][1]-dt_av) > threshold*std_dev) & (gradient[i][1] > 0):
-				z_peak.append(data[i][0])
-				T_peak.append(data[i][1])
-		if (len(z_peak) != 0):
-			dTdz_peaks = np.column_stack((z_peak,T_peak))
-			return(dTdz_peaks)
-
-		else:
-			return(999)
-	else:
-		return(999)
 
 # function to check for consecutive constant temperatures
 def const_temp(data, gradient, consec_points, detection_threshold):
@@ -461,6 +413,62 @@ def T_spike(data, threshold):
 	
 	return(spikes)
 	
+
+# finding characteristic gradient increase spike for hit bottoms
+def grad_spike(data, gradient, threshold):
+	"""
+	threshold: is the number of standard deviations away from the mean gradient value you 
+
+	want to use for identifying a spike (IDENTIFIED 3 IS MOST IDEAL)
+	
+	Using large positive gradient spikes to identify whether or not there is a peak
+	Wire breaks tend to have high temperature after gradient peak, so remove those
+
+	with higher temp after peak
+	Note that this is only to identify clear, large spikes in grad (one property of HB data)
+	"""
+	# importing key data from nested lists
+	n = len(data[:,1])
+	m = len(gradient[:,1])
+	
+	# calculate average gradient value
+	if (m != 0):
+		dt_av = sum(gradient[:,1])/float(m)
+	else:
+		dt_av = 999
+
+	# calculate standard deviation in the gradient (average)
+	"""	
+	Note that this method of finding the standard deviation is not truly good for profiles
+	observable trends in dT (overall trend needs to be subtracted)
+
+	"""
+	sq_dev = 0
+	for i in range(0,m):
+		sq_dev = sq_dev + (dt_av - gradient[i][1])**2
+	if (m != 0):	
+		std_dev = np.sqrt(sq_dev/float(m))
+	
+		"""
+		Finding large peaks (3 std.dev away from average chosen arbitrarily, T must decrease)
+
+		"""	
+		global dTdz_peaks
+		z_peak = []
+		T_peak = []
+		for i in range(0,m):
+			if (abs(gradient[i][1]-dt_av) > threshold*std_dev) & (gradient[i][1] > 0):
+				z_peak.append(data[i][0])
+				T_peak.append(data[i][1])
+		if (len(z_peak) != 0):
+			dTdz_peaks = np.column_stack((z_peak,T_peak))
+			return(dTdz_peaks)
+
+		else:
+			return(999)
+	else:
+		return(999)
+
 
 # code to find the appropriate range of depths from the surrounding bathymetry data
 def depth_limits(latitude, longitude, bath_lon, bath_lat, bath_height):

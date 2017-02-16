@@ -430,15 +430,20 @@ def printProgressBar(iteration,total,prefix='',suffix='',decimals=1,length=100,f
 	''' 
 	Progress bar taken from stack overflow (thank you kind stranger "Greenstick")
 	'''
-	# initialisation of the bar
-	percent = ("{0:."+str(decimals)+"f}").format(100*(iteration/float(total)))
-	filledLength = int(length*iteration//total)
-	bar = fill*filledLength+"-"*(length-filledLength)
-	print('\r%s |%s| %s%% %s'%(prefix,bar,percent,suffix),end='\r')
-
-	# print new line on complete
-	if iteration == total:
+	# attempt to draw to visualise but pass if it will fail
+	try:
+		# initialisation of the bar
+		percent = ("{0:."+str(decimals)+"f}").format(100*(iteration/float(total)))
+		filledLength = int(length*iteration//total)
+		bar = fill*filledLength+"-"*(length-filledLength)
 		print('\r%s |%s| %s%% %s'%(prefix,bar,percent,suffix),end='\r')
+
+		# print new line on complete
+		if iteration == total:
+			print('\r%s |%s| %s%% %s'%(prefix,bar,percent,suffix),end='\r')
+	except:
+		print("error - progress bar cannot be visualised")
+		pass
 
 	# there is nothing to actually return here
 	return(0)
@@ -511,10 +516,11 @@ def reduce_data(X,y):
 
 # filename generation
 path = "../HBfiles/"
+print("\n")
 
 # taking sample of files from the name file
-namefile = open("testset.txt","r")
-print("Opening file to pull neural network input data from...")
+namefile = open("crossvalidation.txt","r")
+print("Opening file to pull neural network input data...")
 name_array = []
 file_names = []
 for line in namefile:
@@ -548,12 +554,13 @@ OUTPUTS:
 """
 
 # initialisation
+print(str(n)+" - number of files to filter through")
 print("Writing features to file")
 
 # writing to file
-f = open('nn_test_data.txt','w')
+f = open('nn_crossvalidation_data_2.txt','w')
 f.write('expect_output,HBpoint,dev,fraction,zdiff,filename,depth,temp,top_gradvar,top_bad,fracBothBelow,place\n')
-
+#f.write('expect_output,HBpoint,dev,fraction,zdiff,filename,depth,temp')
 
 # calling bathymetry data
 [bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
@@ -561,7 +568,6 @@ f.write('expect_output,HBpoint,dev,fraction,zdiff,filename,depth,temp,top_gradva
 for i in range(0,n):
 	filename = name_array[i]
 	raw_name = file_names[i]
-	print("\n")
 	print("File: "+str(raw_name)+" ("+str(i)+")")
 	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
 	
@@ -588,6 +594,7 @@ for i in range(0,n):
 	low_gradvar = filt_low_gradvar
 	extra_bad_data = filt_extra_bad_data
 
+	# continuing only if there is data to extract features from
 	if (type(extra_bad_data) == type(np.array([0,0,0]))) & (len(extra_bad_data) != 0):
 
 		# sorting and removing all of the repeats in bad data
@@ -603,7 +610,7 @@ for i in range(0,n):
 
 			# these are the neural network inputs and outputs
 			nnInput = prepare_network(j, bad_data, gradSpike, TSpike, data, gradient, bathy_depth)
-			nnInput = nn.feature_scaling(nnInput)
+			nnInput = nn.feature_scaling(nnInput)	
 			nnInput2 = additional_features(j, data, gradient, bad_data,
 										  bath_lon, bath_lat, bath_height, longitude, latitude,
 										  low_gradvar, const_bad_data, total_lowvar, upper_lim)
@@ -612,11 +619,16 @@ for i in range(0,n):
 			# writing parameters to file
 			f.write(str(nnOutput)+','+str(nnInput[0])+','+str(nnInput[1])+','
 					+str(nnInput[2])+','+str(nnInput[3])+','+str(raw_name)	
-					+','+str(bad_data[j][0])+','+str(bad_data[j][1])
+					+','+str(bad_data[j][0])+','+str(bad_data[j][1])+','
 					+str(nnInput2[0])+','+str(nnInput2[1])+','+str(nnInput2[2])+','+str(nnInput2[3])+'\n')
 
-	else:
-		continue
+	else:	
+		print("No data points in profile, moving to next...")
+		print("\n")
+		continue	
+	
+	# printing newline character to make code look nicer
+	print("\n")
 
 # completed writing parameters from the training set
 f.close()

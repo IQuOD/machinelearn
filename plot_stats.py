@@ -12,7 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 ######################################################################################################
 # reading in files and creating plots
-"""
+
 # temperature spike statistics
 dat= []
 with open('stats_T_spike.txt') as f:
@@ -32,21 +32,21 @@ for i in range(0,len(dat)):
 	total.append(dat[i][2])
 
 # plotting bar graph of the number of detections against total number
-plt.plot(domain, first)
+plt.bar(domain, first)
 plt.xscale('log')
 plt.title("Temperature spike - Num. first point within 5m of the HB")
 plt.ylabel("Number of points")
 plt.xlabel("Threshold (for detection)")
 plt.show()
 
-plt.plot(domain, total)
+plt.bar(domain, total)
 plt.xscale('log')
 plt.title("Temperature spike - Points within HB zone")
 plt.ylabel("Number of points")
 plt.xlabel("Threshold (for detection)")
 plt.show()
 
-plt.plot(domain,frac)
+plt.bar(domain,frac)
 plt.xscale('log')
 plt.title("Temperature spike - fraction of points at HB to points in HB region")
 plt.xlabel("Threshold (for detection)")
@@ -173,7 +173,6 @@ plt.ylabel("Percentage (below HB points/total points)")
 plt.show()
 
 f.close()
-"""
 
 ######################################################################################################
 

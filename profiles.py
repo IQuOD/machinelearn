@@ -60,9 +60,11 @@ path = "../HBfiles/"
 #namefile = open("HBfiles_golden.txt","r")
 namefile = open("nn_filecheck.txt","r")
 name_array = []
+raw_name = []
 for line in namefile:
 	line = line.rstrip()
 	name = str(path+line)
+	raw_name.append(str(line))
 	name_array.append(name)
 namefile.close()
 
@@ -71,6 +73,7 @@ for i in range(0,len(name_array)):
 	
 	# reading in file here
 	filename = name_array[i]
+	rawname = raw_name[i]
 	print(i,filename)
 	[data, gradient, flags, hb_depth, latitude, longitude, date] = hb.read_data(filename)
 	[bath_height, bath_lon, bath_lat] = hb.bathymetry("../terrainbase.nc")
@@ -85,7 +88,7 @@ for i in range(0,len(name_array)):
 	bathydepth = hb.bath_depth(latitude, longitude, bath_lon, bath_lat, bath_height)
 	low_gradvar = hb.grad_var(data, gradient, 5, 100)
 	up_lim = hb.depth_limits(latitude, longitude, bath_lon, bath_lat, bath_height)
-	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, filename, 
+	hb.plot_data(True, data, gradient, flags, bathydepth, error_pts, pot_hb, rawname, 
 				 low_gradvar, up_lim)
 	print("\n")
 

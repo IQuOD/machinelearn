@@ -1,6 +1,7 @@
 README file for CSIRO Project - Exploring machine learning to quality control ocean historic XBT temperature data. 
 
 By Austin X Shen
+April, 2017
 ________________________________________________________________________________________
 
 Inside this package there are a mixture of scripts used to run machine learning algorithms, created packages that the scripts are dependent on, neural network training data, filename data and some directories storing selected tests. All files used over the course of the program are contained in this directory and so some older tests and programs that are not relevant to the final program will exist. I will categorise each of the files below and give a brief description about what the script/code/data does. The listing of the files will be in alphabetical order (or as they have appeared in on my screen). At the end of this I will discuss the key scripts and libraries that are required for execution of the final bottom flags program.
